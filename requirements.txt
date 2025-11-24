@@ -7,9 +7,6 @@ google-generativeai
 google-cloud-texttospeech
 lxml
 gunicorn
-
-Security patches (Snyk)
-
 werkzeug>=3.0.6
 protobuf>=4.25.8
 urllib3>=2.2.2
