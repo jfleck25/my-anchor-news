@@ -15,10 +15,16 @@ import google.generativeai as genai
 from google.cloud import texttospeech
 from google.api_core import client_options 
 from bs4 import BeautifulSoup
-import google.auth.transport.requests 
+import google.auth.transport.requests
+# --- FIX: Import ProxyFix ---
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # --- Configuration & Constants ---
 app = flask.Flask(__name__, static_folder='.', static_url_path='')
+
+# --- FIX: Tell Flask to trust Render's Proxy Headers ---
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
 CORS(app, supports_credentials=True)
 
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "default_secret_key_for_development")
@@ -190,6 +196,8 @@ def login():
     config = get_client_secrets_config()
     if isinstance(config, dict):
         flow = Flow.from_client_config(config, scopes=SCOPES)
+        # Use Flask's url_for to generate the redirect URI. 
+        # ProxyFix will ensure _external=True generates an HTTPS url on Render.
         flow.redirect_uri = url_for('oauth2callback', _external=True)
     else:
         flow = Flow.from_client_secrets_file(config, scopes=SCOPES, redirect_uri=url_for('oauth2callback', _external=True))
@@ -213,7 +221,6 @@ def oauth2callback():
     credentials = flow.credentials
     session['credentials'] = {'token': credentials.token, 'refresh_token': credentials.refresh_token, 'token_uri': credentials.token_uri, 'client_id': credentials.client_id, 'client_secret': credentials.client_secret, 'scopes': credentials.scopes}
     
-    # --- CRITICAL FIX: Redirect to root path, NOT localhost ---
     return redirect("/")
 
 @app.route('/logout')
