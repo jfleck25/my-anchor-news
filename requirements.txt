@@ -1,5 +1,5 @@
 flask
-flask-cors
+flask-cors>=5.0.0
 google-api-python-client
 google-auth-oauthlib
 beautifulsoup4
@@ -7,4 +7,11 @@ google-generativeai
 google-cloud-texttospeech
 lxml
 gunicorn
-werkzeug
+
+Security patches (Snyk)
+
+werkzeug>=3.0.6
+protobuf>=4.25.8
+urllib3>=2.2.2
+requests>=2.32.2
+zipp>=3.19.1
