@@ -1,24 +1,29 @@
-# Use the standard Python image (includes build tools for lxml)
-FROM python:3.10
+# Use the slim image to keep things lightweight
+FROM python:3.10-slim
 
-# Set the working directory in the container
+# Set the working directory
 WORKDIR /app
 
-# Copy the requirements file into the container
-COPY requirements.txt .
+# Install system dependencies required for building lxml and grpcio
+# (This fixes the "pip install" compilation errors)
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libxml2-dev \
+    libxslt1-dev \
+    zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install any needed packages specified in requirements.txt
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
+# Copy the rest of the application
 COPY . .
 
-# Expose port 8080 (Standard for Google Cloud Run / many PaaS)
+# Configuration
 ENV PORT=8080
 EXPOSE 8080
-
-# Define environment variable for production
 ENV FLASK_ENV=production
 
-# Run gunicorn when the container launches
+# Start the server
 CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 main:app
