@@ -1,0 +1,1 @@
+flaskflask-corsgoogle-api-python-clientgoogle-auth-oauthlibbeautifulsoup4google-generativeaigoogle-cloud-texttospeechlxmlgunicorn
