@@ -18,7 +18,9 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/babel">
-        const backendUrl = "";
+        // --- CRITICAL FIX FOR DEPLOYMENT ---
+        // Leave this empty so it uses the relative path (e.g. https://your-app.onrender.com/api/...)
+        const backendUrl = ""; 
 
         // --- Component: Settings Modal ---
         const SettingsModal = ({ isOpen, onClose, currentSettings, onSave }) => {
@@ -32,6 +34,14 @@
                 if (newSource && !sources.includes(newSource)) {
                     setSources([...sources, newSource]);
                     setNewSource("");
+                }
+            };
+
+            // --- FIX: Allow "Enter" key to submit ---
+            const handleKeyDown = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault(); // Prevent form submission behaviors
+                    handleAddSource();
                 }
             };
 
@@ -75,6 +85,7 @@
                                     type="text" 
                                     value={newSource}
                                     onChange={(e) => setNewSource(e.target.value)}
+                                    onKeyDown={handleKeyDown} 
                                     placeholder="e.g. theverge.com"
                                     className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline mr-2"
                                 />
@@ -279,8 +290,7 @@
                 const checkUserAuth = async () => {
                     try {
                         const res = await fetch(`${backendUrl}/api/check_auth`, { credentials: 'include' });
-                        // --- FIX: Changed 'response.json()' to 'res.json()' ---
-                        const data = await res.json(); 
+                        const data = await res.json();
                         if (data.logged_in) setUserInfo(data.user);
                     } catch (error) { console.error("Auth Check Failed:", error); } 
                     finally { setIsLoading(false); }
