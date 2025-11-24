@@ -1,5 +1,5 @@
 flask
-flask-cors>=5.0.0
+flask-cors>=6.0.0
 google-api-python-client
 google-auth-oauthlib
 beautifulsoup4
