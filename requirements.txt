@@ -1,1 +1,9 @@
-flaskflask-corsgoogle-api-python-clientgoogle-auth-oauthlibbeautifulsoup4google-generativeaigoogle-cloud-texttospeechlxmlgunicorn
+flask
+flask-cors
+google-api-python-client
+google-auth-oauthlib
+beautifulsoup4
+google-generativeai
+google-cloud-texttospeech
+lxml
+gunicorn

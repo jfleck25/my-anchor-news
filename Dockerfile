@@ -1,24 +1,24 @@
-# Use the standard Python image (includes build tools for lxml)
+# Use the standard Python image (larger, but has all standard tools)
 FROM python:3.10
 
-# Set the working directory in the container
+# Set the working directory
 WORKDIR /app
 
-# Copy the requirements file into the container
+# Copy the requirements file
 COPY requirements.txt .
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# 1. Upgrade pip to the latest version (CRITICAL for finding pre-built binaries)
+# 2. Install dependencies
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
+# Copy the application code
 COPY . .
 
-# Expose port 8080 (Standard for Google Cloud Run / many PaaS)
+# Configuration
 ENV PORT=8080
 EXPOSE 8080
-
-# Define environment variable for production
 ENV FLASK_ENV=production
 
-# Run gunicorn when the container launches
+# Start the server
 CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 main:app
