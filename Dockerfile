@@ -1,5 +1,5 @@
-# Use an official Python runtime as a parent image
-FROM python:3.10-slim
+# Use the standard Python image (includes build tools for lxml)
+FROM python:3.10
 
 # Set the working directory in the container
 WORKDIR /app
@@ -8,7 +8,6 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install any needed packages specified in requirements.txt
-# We don't need a virtualenv in Docker because the container IS the environment
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code
@@ -22,5 +21,4 @@ EXPOSE 8080
 ENV FLASK_ENV=production
 
 # Run gunicorn when the container launches
-# This binds to 0.0.0.0:$PORT
 CMD exec gunicorn --bind :$PORT --workers 1 --threads 8 --timeout 0 main:app
