@@ -1,0 +1,25 @@
+Secrets (Never upload these!)
+
+client_secrets.json
+client_secrets old.json
+user_settings.json
+cache.json
+
+Python caches
+
+pycache/
+*.py[cod]
+
+Virtual Environment
+
+venv/
+env/
+
+Environment variables
+
+.env
+
+OS generated files
+
+.DS_Store
+Thumbs.db
