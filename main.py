@@ -22,6 +22,7 @@ app = flask.Flask(__name__, static_folder='.', static_url_path='')
 CORS(app, supports_credentials=True)
 
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "default_secret_key_for_development")
+# Allow HTTP for local dev, but in production (HTTPS) this usually doesn't hurt
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 SCOPES = [
@@ -38,7 +39,6 @@ CACHE_FILE = "cache.json"
 CACHE_TTL_SECONDS = 900 # 15 Minutes
 
 # --- Production Secrets Handling ---
-# In production, we load secrets from an ENV variable to avoid committing files
 def get_client_secrets_config():
     env_secrets = os.environ.get("GOOGLE_CLIENT_SECRETS_JSON")
     if env_secrets:
@@ -56,7 +56,6 @@ def get_client_secrets_config():
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
 if not PROJECT_ID:
     try:
-        # Try to parse from file or env config
         config = get_client_secrets_config()
         if isinstance(config, dict):
             secrets = config
@@ -92,20 +91,17 @@ else:
 # --- Caching Helpers ---
 
 def load_cache():
-    """Loads the cache file if it exists."""
     if not os.path.exists(CACHE_FILE): return {}
     try:
         with open(CACHE_FILE, 'r') as f: return json.load(f)
     except: return {}
 
 def save_cache(data):
-    """Saves data to the cache file."""
     try:
         with open(CACHE_FILE, 'w') as f: json.dump(data, f)
     except Exception as e: print(f"Cache Write Error: {e}")
 
 def get_settings_hash(settings):
-    """Creates a unique fingerprint for the current settings."""
     s = json.dumps(settings, sort_keys=True)
     return hashlib.md5(s.encode()).hexdigest()
 
@@ -185,7 +181,6 @@ def analyze_news_with_llm(newsletters_text):
 
 # --- Routes ---
 
-# NEW: Serve the React App directly
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
@@ -195,7 +190,6 @@ def login():
     config = get_client_secrets_config()
     if isinstance(config, dict):
         flow = Flow.from_client_config(config, scopes=SCOPES)
-        # Must manually set redirect URI if using dict config
         flow.redirect_uri = url_for('oauth2callback', _external=True)
     else:
         flow = Flow.from_client_secrets_file(config, scopes=SCOPES, redirect_uri=url_for('oauth2callback', _external=True))
@@ -218,7 +212,8 @@ def oauth2callback():
     flow.fetch_token(authorization_response=request.url)
     credentials = flow.credentials
     session['credentials'] = {'token': credentials.token, 'refresh_token': credentials.refresh_token, 'token_uri': credentials.token_uri, 'client_id': credentials.client_id, 'client_secret': credentials.client_secret, 'scopes': credentials.scopes}
-    # Redirect to home, not specific port
+    
+    # --- CRITICAL FIX: Redirect to root path, NOT localhost ---
     return redirect("/")
 
 @app.route('/logout')
@@ -246,7 +241,6 @@ def update_settings():
 def fetch_emails():
     if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
     
-    # --- CACHE CHECK ---
     settings = load_settings()
     current_hash = get_settings_hash(settings)
     cache = load_cache()
@@ -254,10 +248,7 @@ def fetch_emails():
     if (cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and \
        (cache.get('settings_hash') == current_hash) and \
        (cache.get('analysis')):
-        print("DEBUG: Serving Analysis from CACHE")
         return jsonify(cache['analysis'])
-    
-    print("DEBUG: Cache invalid or expired. Fetching fresh data...")
     
     creds = Credentials(**session['credentials'])
     try:
@@ -309,25 +300,11 @@ def fetch_emails():
         return jsonify(analysis_result)
 
     except Exception as e:
-        print(f"Fetch Error: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/generate_audio', methods=['POST'])
 def generate_audio():
     if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
-    
-    analysis_data = request.get_json()
-    if not analysis_data: return jsonify({"error": "No analysis data provided."}), 400
-    
-    script_text = generate_script_from_analysis(analysis_data)
-    script_hash = hashlib.md5(script_text.encode()).hexdigest()
-    
-    cache = load_cache()
-    if cache.get('script_hash') == script_hash and cache.get('audio'):
-        print("DEBUG: Serving Audio from CACHE")
-        return jsonify({"audio_content": cache['audio']})
-    
-    print("DEBUG: Generating Fresh Audio...")
     
     creds_data = session['credentials']
     creds = Credentials(**creds_data)
@@ -343,7 +320,17 @@ def generate_audio():
     if PROJECT_ID: client_opts = client_options.ClientOptions(quota_project_id=PROJECT_ID)
     tts_client = texttospeech.TextToSpeechClient(credentials=creds, client_options=client_opts, transport="rest")
     
+    analysis_data = request.get_json()
+    if not analysis_data: return jsonify({"error": "No analysis data provided."}), 400
+    
     try:
+        script_text = generate_script_from_analysis(analysis_data)
+        script_hash = hashlib.md5(script_text.encode()).hexdigest()
+        
+        cache = load_cache()
+        if cache.get('script_hash') == script_hash and cache.get('audio'):
+            return jsonify({"audio_content": cache['audio']})
+        
         sentences = re.split(r'(?<=[.!?])\s+', script_text)
         chunks = []
         current_chunk = ""
@@ -375,7 +362,6 @@ def generate_audio():
         return jsonify({"audio_content": audio_base64})
 
     except Exception as e:
-        print(f"Audio Error: {e}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
