@@ -15,20 +15,18 @@ import google.generativeai as genai
 from google.cloud import texttospeech
 from google.api_core import client_options 
 from bs4 import BeautifulSoup
-import google.auth.transport.requests
-# --- FIX: Import ProxyFix ---
+import google.auth.transport.requests 
 from werkzeug.middleware.proxy_fix import ProxyFix
+import psycopg2 
+from psycopg2.extras import RealDictCursor
 
 # --- Configuration & Constants ---
 app = flask.Flask(__name__, static_folder='.', static_url_path='')
-
-# --- FIX: Tell Flask to trust Render's Proxy Headers ---
+# Trust Render's proxy headers
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
-
 CORS(app, supports_credentials=True)
 
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "default_secret_key_for_development")
-# Allow HTTP for local dev, but in production (HTTPS) this usually doesn't hurt
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 SCOPES = [
@@ -40,78 +38,39 @@ SCOPES = [
 ]
 
 CLIENT_SECRETS_FILE = "client_secrets.json"
-SETTINGS_FILE = "user_settings.json"
-CACHE_FILE = "cache.json"
-CACHE_TTL_SECONDS = 900 # 15 Minutes
+SETTINGS_FILE = "user_settings.json" # Fallback for local dev
+CACHE_FILE = "cache.json" # Local cache (Redis is Phase 6)
+CACHE_TTL_SECONDS = 900 
 
-# --- Production Secrets Handling ---
-def get_client_secrets_config():
-    env_secrets = os.environ.get("GOOGLE_CLIENT_SECRETS_JSON")
-    if env_secrets:
-        try:
-            return json.loads(env_secrets)
-        except json.JSONDecodeError:
-            print("Error parsing GOOGLE_CLIENT_SECRETS_JSON")
-    
-    if os.path.exists(CLIENT_SECRETS_FILE):
-        return CLIENT_SECRETS_FILE
-        
-    raise FileNotFoundError("Client secrets not found in ENV or file.")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# --- Load Project ID ---
-PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
-if not PROJECT_ID:
+# --- Database Setup (Postgres) ---
+def init_db():
+    """Creates the users table if it doesn't exist."""
+    if not DATABASE_URL: 
+        print(" * Running in Local Mode (No Database URL found)")
+        return
     try:
-        config = get_client_secrets_config()
-        if isinstance(config, dict):
-            secrets = config
-        else:
-            with open(config, 'r') as f:
-                secrets = json.load(f)
-        
-        data = secrets.get('web') or secrets.get('installed')
-        if data: PROJECT_ID = data.get('project_id')
-    except: pass
-
-if not PROJECT_ID: print("CRITICAL WARNING: PROJECT_ID could not be determined. TTS will likely fail.")
-
-# Default Settings
-DEFAULT_SETTINGS = {
-    "sources": ["wsj.com", "nytimes.com", "axios.com", "theguardian.com", "techcrunch.com"],
-    "time_window_hours": 24
-}
-
-# --- Startup Checks ---
-api_key = os.environ.get("GOOGLE_API_KEY")
-if not api_key:
-    print("WARNING: GOOGLE_API_KEY not set. AI features will fail.")
-else:
-    print(f" * AI Configuration: API Key detected.")
-    try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        # Create table to store user settings as a JSON blob
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS user_settings (
+                user_email VARCHAR(255) PRIMARY KEY,
+                settings JSONB
+            );
+        """)
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(" * Database connection successful. Table initialized.")
     except Exception as e:
-        print(f"Error configuring Gemini: {e}")
-        model = None
+        print(f" * DB Init Error: {e}")
 
-# --- Caching Helpers ---
+# Initialize DB on startup
+init_db()
 
-def load_cache():
-    if not os.path.exists(CACHE_FILE): return {}
-    try:
-        with open(CACHE_FILE, 'r') as f: return json.load(f)
-    except: return {}
-
-def save_cache(data):
-    try:
-        with open(CACHE_FILE, 'w') as f: json.dump(data, f)
-    except Exception as e: print(f"Cache Write Error: {e}")
-
-def get_settings_hash(settings):
-    s = json.dumps(settings, sort_keys=True)
-    return hashlib.md5(s.encode()).hexdigest()
-
-# --- Existing Helpers ---
+# --- Helper Functions ---
 
 def get_user_info():
     if 'credentials' not in session: return None
@@ -121,19 +80,95 @@ def get_user_info():
         return user_info_service.userinfo().get().execute()
     except: return None
 
-def load_settings():
-    if not os.path.exists(SETTINGS_FILE): return DEFAULT_SETTINGS
+def load_settings(user_email=None):
+    """Loads settings from Postgres (if avail) or JSON file."""
+    # Default settings structure
+    defaults = {
+        "sources": ["wsj.com", "nytimes.com", "axios.com", "theguardian.com", "techcrunch.com"],
+        "time_window_hours": 24
+    }
+
+    # 1. Try Postgres
+    if DATABASE_URL and user_email:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute("SELECT settings FROM user_settings WHERE user_email = %s", (user_email,))
+            row = cur.fetchone()
+            cur.close()
+            conn.close()
+            if row:
+                # Merge with defaults to ensure missing keys don't break things
+                user_settings = defaults.copy()
+                user_settings.update(row['settings'])
+                return user_settings
+            else:
+                return defaults
+        except Exception as e:
+            print(f"DB Read Error: {e}")
+            return defaults
+
+    # 2. Fallback to Local JSON (for localhost or if DB fails)
+    if not os.path.exists(SETTINGS_FILE): return defaults
     try:
         with open(SETTINGS_FILE, 'r') as f: return json.load(f)
-    except: return DEFAULT_SETTINGS
+    except: return defaults
 
-def save_settings(new_settings):
+def save_settings(new_settings, user_email=None):
+    """Saves settings to Postgres (if avail) or JSON file."""
+    
+    # 1. Try Postgres
+    if DATABASE_URL and user_email:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            # Upsert (Insert or Update)
+            cur.execute("""
+                INSERT INTO user_settings (user_email, settings)
+                VALUES (%s, %s)
+                ON CONFLICT (user_email) 
+                DO UPDATE SET settings = EXCLUDED.settings;
+            """, (user_email, json.dumps(new_settings)))
+            conn.commit()
+            cur.close()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"DB Write Error: {e}")
+            return False
+
+    # 2. Fallback to Local JSON
     try:
-        final = DEFAULT_SETTINGS.copy()
-        final.update(new_settings)
-        with open(SETTINGS_FILE, 'w') as f: json.dump(final, f, indent=2)
+        with open(SETTINGS_FILE, 'w') as f: json.dump(new_settings, f, indent=2)
         return True
     except: return False
+
+# --- Secrets & AI Config ---
+def get_client_secrets_config():
+    env_secrets = os.environ.get("GOOGLE_CLIENT_SECRETS_JSON")
+    if env_secrets:
+        try: return json.loads(env_secrets)
+        except json.JSONDecodeError: pass
+    if os.path.exists(CLIENT_SECRETS_FILE): return CLIENT_SECRETS_FILE
+    raise FileNotFoundError("Client secrets not found.")
+
+PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
+if not PROJECT_ID:
+    try:
+        config = get_client_secrets_config()
+        if isinstance(config, dict): secrets = config
+        else:
+            with open(config, 'r') as f: secrets = json.load(f)
+        data = secrets.get('web') or secrets.get('installed')
+        if data: PROJECT_ID = data.get('project_id')
+    except: pass
+
+api_key = os.environ.get("GOOGLE_API_KEY")
+if api_key:
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+    except: model = None
 
 def sanitize_for_llm(text):
     text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
@@ -175,7 +210,6 @@ def analyze_news_with_llm(newsletters_text):
     
     Content: ---
     """ + newsletters_text
-    
     try:
         generation_config = genai.types.GenerationConfig(max_output_tokens=8192, temperature=0.2)
         response = model.generate_content(prompt, generation_config=generation_config)
@@ -184,6 +218,20 @@ def analyze_news_with_llm(newsletters_text):
         else: raise ValueError("No valid JSON found.")
     except json.JSONDecodeError: return {"error": "Analysis failed due to volume."}
     except Exception as e: return {"error": "AI analysis failed."}
+
+# --- Caching Helpers ---
+def load_cache():
+    if not os.path.exists(CACHE_FILE): return {}
+    try: with open(CACHE_FILE, 'r') as f: return json.load(f)
+    except: return {}
+
+def save_cache(data):
+    try: with open(CACHE_FILE, 'w') as f: json.dump(data, f)
+    except: pass
+
+def get_settings_hash(settings):
+    s = json.dumps(settings, sort_keys=True)
+    return hashlib.md5(s.encode()).hexdigest()
 
 # --- Routes ---
 
@@ -196,8 +244,6 @@ def login():
     config = get_client_secrets_config()
     if isinstance(config, dict):
         flow = Flow.from_client_config(config, scopes=SCOPES)
-        # Use Flask's url_for to generate the redirect URI. 
-        # ProxyFix will ensure _external=True generates an HTTPS url on Render.
         flow.redirect_uri = url_for('oauth2callback', _external=True)
     else:
         flow = Flow.from_client_secrets_file(config, scopes=SCOPES, redirect_uri=url_for('oauth2callback', _external=True))
@@ -209,18 +255,15 @@ def login():
 @app.route('/oauth2callback')
 def oauth2callback():
     state = session['state']
-    
     config = get_client_secrets_config()
     if isinstance(config, dict):
         flow = Flow.from_client_config(config, scopes=SCOPES)
         flow.redirect_uri = url_for('oauth2callback', _external=True)
     else:
         flow = Flow.from_client_secrets_file(config, scopes=SCOPES, state=state, redirect_uri=url_for('oauth2callback', _external=True))
-        
     flow.fetch_token(authorization_response=request.url)
     credentials = flow.credentials
     session['credentials'] = {'token': credentials.token, 'refresh_token': credentials.refresh_token, 'token_uri': credentials.token_uri, 'client_id': credentials.client_id, 'client_secret': credentials.client_secret, 'scopes': credentials.scopes}
-    
     return redirect("/")
 
 @app.route('/logout')
@@ -236,19 +279,27 @@ def check_auth():
 @app.route('/api/settings', methods=['GET'])
 def get_settings():
     if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
-    return jsonify(load_settings())
+    user_info = get_user_info()
+    email = user_info.get('email') if user_info else None
+    return jsonify(load_settings(email))
 
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
     if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
-    if save_settings(request.get_json()): return jsonify({'status': 'success'})
+    user_info = get_user_info()
+    email = user_info.get('email') if user_info else None
+    if save_settings(request.get_json(), email):
+        return jsonify({'status': 'success'})
     return jsonify({'error': 'Failed to save settings'}), 500
 
 @app.route('/api/fetch_emails')
 def fetch_emails():
     if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
     
-    settings = load_settings()
+    user_info = get_user_info()
+    email = user_info.get('email') if user_info else None
+    settings = load_settings(email)
+    
     current_hash = get_settings_hash(settings)
     cache = load_cache()
     
