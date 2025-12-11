@@ -1,5 +1,5 @@
 # Use the standard Python image (larger, but has all standard tools)
-FROM python:3.10
+FROM python:3.15-rc-slim-trixie
 
 # Set the working directory
 WORKDIR /app
