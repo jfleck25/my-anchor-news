@@ -50,17 +50,18 @@
 <body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-200">
     <div id="root"></div>
 
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- React Dependencies -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/babel">
         // --- Configuration ---
+        // Leave empty for production (relative path). 
+        // For local dev with separate ports, use "http://127.0.0.1:5000"
         const backendUrl = ""; 
 
-        // --- Icons (Using Lucide via SVG for React compatibility without build step) ---
+        // --- Icons (Defined as React Components) ---
         const Icons = {
             Settings: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
             Moon: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>,
@@ -110,7 +111,7 @@
                         <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
                             <h3 className="text-lg font-semibold text-slate-800 dark:text-white font-sans">Configuration</h3>
                             <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                <Icons.Settings />
                             </button>
                         </div>
 
@@ -283,7 +284,7 @@
             };
             
             return (
-                <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-32"> {/* Added padding bottom for fixed player */}
+                <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-32">
                     {/* Header */}
                     <nav className="glass sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800">
                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -446,9 +447,39 @@
             );
         };
 
+        // --- Main App Entry ---
+        const App = () => {
+            const [userInfo, setUserInfo] = React.useState(null);
+            const [isLoading, setIsLoading] = React.useState(true);
+
+            React.useEffect(() => {
+                const checkUserAuth = async () => {
+                    try {
+                        const res = await fetch(`${backendUrl}/api/check_auth`, { credentials: 'include' });
+                        // Add error handling for non-200 responses
+                        if (!res.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        const data = await res.json();
+                        if (data.logged_in) setUserInfo(data.user);
+                    } catch (error) { 
+                        console.error("Auth Check Failed:", error); 
+                    } finally { 
+                        setIsLoading(false); 
+                    }
+                };
+                checkUserAuth();
+            }, []);
+
+            if (isLoading) return <div className="min-h-screen flex items-center justify-center"><p>Loading...</p></div>;
+            return userInfo ? <Dashboard userInfo={userInfo} /> : <LoginPage />;
+        };
+        
         const container = document.getElementById('root');
-        const root = ReactDOM.createRoot(container);
-        root.render(<App />);
+        if (container) {
+            const root = ReactDOM.createRoot(container);
+            root.render(<App />);
+        }
     </script>
 </body>
 </html>
