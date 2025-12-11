@@ -5,7 +5,7 @@ import json
 import re
 import time
 import hashlib
-import uuid # --- NEW: For unique share IDs
+import uuid
 import flask
 from flask import request, redirect, session, url_for, jsonify, send_from_directory
 from flask_cors import CORS
@@ -52,14 +52,12 @@ def init_db():
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
-        # User Settings Table
         cur.execute("""
             CREATE TABLE IF NOT EXISTS user_settings (
                 user_email VARCHAR(255) PRIMARY KEY,
                 settings JSONB
             );
         """)
-        # --- NEW: Shared Briefings Table ---
         cur.execute("""
             CREATE TABLE IF NOT EXISTS shared_briefings (
                 share_id UUID PRIMARY KEY,
@@ -77,8 +75,6 @@ def init_db():
 init_db()
 
 # --- Helper Functions ---
-# (Existing helpers: get_user_info, load_settings, save_settings, sanitize, script gen, analyze)
-# ... [Keeping previous helper functions unchanged to save space] ...
 
 def get_user_info():
     if 'credentials' not in session: return None
@@ -93,6 +89,7 @@ def load_settings(user_email=None):
         "sources": ["wsj.com", "nytimes.com", "axios.com", "theguardian.com", "techcrunch.com"],
         "time_window_hours": 24
     }
+    
     if DATABASE_URL and user_email:
         try:
             conn = psycopg2.connect(DATABASE_URL)
@@ -105,11 +102,19 @@ def load_settings(user_email=None):
                 user_settings = defaults.copy()
                 user_settings.update(row['settings'])
                 return user_settings
-            else: return defaults
-        except: return defaults
-    if not os.path.exists(SETTINGS_FILE): return defaults
-    try: with open(SETTINGS_FILE, 'r') as f: return json.load(f)
-    except: return defaults
+            else: 
+                return defaults
+        except: 
+            return defaults
+
+    if not os.path.exists(SETTINGS_FILE): 
+        return defaults
+    
+    try: 
+        with open(SETTINGS_FILE, 'r') as f: 
+            return json.load(f)
+    except: 
+        return defaults
 
 def save_settings(new_settings, user_email=None):
     if DATABASE_URL and user_email:
@@ -124,37 +129,49 @@ def save_settings(new_settings, user_email=None):
             cur.close()
             conn.close()
             return True
-        except: return False
+        except: 
+            return False
+            
     try:
-        with open(SETTINGS_FILE, 'w') as f: json.dump(new_settings, f, indent=2)
+        with open(SETTINGS_FILE, 'w') as f: 
+            json.dump(new_settings, f, indent=2)
         return True
-    except: return False
+    except: 
+        return False
 
 def get_client_secrets_config():
     env_secrets = os.environ.get("GOOGLE_CLIENT_SECRETS_JSON")
     if env_secrets:
-        try: return json.loads(env_secrets)
-        except json.JSONDecodeError: pass
-    if os.path.exists(CLIENT_SECRETS_FILE): return CLIENT_SECRETS_FILE
+        try: 
+            return json.loads(env_secrets)
+        except json.JSONDecodeError: 
+            pass
+    if os.path.exists(CLIENT_SECRETS_FILE): 
+        return CLIENT_SECRETS_FILE
     raise FileNotFoundError("Client secrets not found.")
 
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
 if not PROJECT_ID:
     try:
         config = get_client_secrets_config()
-        if isinstance(config, dict): secrets = config
+        if isinstance(config, dict): 
+            secrets = config
         else:
-            with open(config, 'r') as f: secrets = json.load(f)
+            with open(config, 'r') as f: 
+                secrets = json.load(f)
         data = secrets.get('web') or secrets.get('installed')
-        if data: PROJECT_ID = data.get('project_id')
-    except: pass
+        if data: 
+            PROJECT_ID = data.get('project_id')
+    except: 
+        pass
 
 api_key = os.environ.get("GOOGLE_API_KEY")
 if api_key:
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
-    except: model = None
+    except: 
+        model = None
 
 def sanitize_for_llm(text):
     text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
@@ -171,16 +188,19 @@ def generate_script_from_analysis(analysis_json):
             for story in stories:
                 source = story.get('source', 'One source').split('<')[0].strip().replace('.com', '')
                 script += f"The {source} {story.get('angle', '')}. "
-        if i < len(story_groups) - 1: script += " Moving on... "
+        if i < len(story_groups) - 1: 
+            script += " Moving on... "
     remaining = analysis_json.get('remaining_stories', [])
     if remaining:
         script += "In brief: "
-        for story in remaining: script += f"{story.get('headline', '')}. "
+        for story in remaining: 
+            script += f"{story.get('headline', '')}. "
     script += "That concludes your briefing."
     return script
 
 def analyze_news_with_llm(newsletters_text):
-    if not model: raise Exception("Gemini API model is not configured.")
+    if not model: 
+        raise Exception("Gemini API model is not configured.")
     prompt = """
     You are an elite media analyst. Provide raw text from multiple newsletters.
     Task:
@@ -200,19 +220,30 @@ def analyze_news_with_llm(newsletters_text):
         generation_config = genai.types.GenerationConfig(max_output_tokens=8192, temperature=0.2)
         response = model.generate_content(prompt, generation_config=generation_config)
         match = re.search(r'\{.*\}', response.text, re.DOTALL)
-        if match: return json.loads(match.group(0))
-        else: raise ValueError("No valid JSON found.")
-    except json.JSONDecodeError: return {"error": "Analysis failed due to volume."}
-    except Exception as e: return {"error": "AI analysis failed."}
+        if match: 
+            return json.loads(match.group(0))
+        else: 
+            raise ValueError("No valid JSON found.")
+    except json.JSONDecodeError: 
+        return {"error": "Analysis failed due to volume."}
+    except Exception as e: 
+        return {"error": "AI analysis failed."}
 
 def load_cache():
-    if not os.path.exists(CACHE_FILE): return {}
-    try: with open(CACHE_FILE, 'r') as f: return json.load(f)
-    except: return {}
+    if not os.path.exists(CACHE_FILE): 
+        return {}
+    try: 
+        with open(CACHE_FILE, 'r') as f: 
+            return json.load(f)
+    except: 
+        return {}
 
 def save_cache(data):
-    try: with open(CACHE_FILE, 'w') as f: json.dump(data, f)
-    except: pass
+    try: 
+        with open(CACHE_FILE, 'w') as f: 
+            json.dump(data, f)
+    except: 
+        pass
 
 def get_settings_hash(settings):
     s = json.dumps(settings, sort_keys=True)
@@ -221,7 +252,8 @@ def get_settings_hash(settings):
 # --- Routes ---
 
 @app.route('/')
-def index(): return send_from_directory('.', 'index.html')
+def index():
+    return send_from_directory('.', 'index.html')
 
 @app.route('/login')
 def login():
@@ -331,9 +363,8 @@ def fetch_emails():
 
 @app.route('/api/generate_audio', methods=['POST'])
 def generate_audio():
-    # ... (Keeping existing audio generation logic) ...
-    # Simplified copy for brevity - assume previous logic
     if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
+    
     creds_data = session['credentials']
     creds = Credentials(**creds_data)
     try:
@@ -350,7 +381,6 @@ def generate_audio():
     cache = load_cache()
     if cache.get('script_hash') == script_hash and cache.get('audio'): return jsonify({"audio_content": cache['audio']})
     
-    # ... (TTS Chunking Logic) ...
     sentences = re.split(r'(?<=[.!?])\s+', script_text)
     chunks = []; current_chunk = ""; byte_limit = 4800
     for sentence in sentences:
@@ -371,53 +401,35 @@ def generate_audio():
     cache['script_hash'] = script_hash; cache['audio'] = audio_base64; save_cache(cache)
     return jsonify({"audio_content": audio_base64})
 
-# --- NEW: Share Endpoints ---
-
+# --- Share Endpoints ---
 @app.route('/api/share', methods=['POST'])
 def share_briefing():
-    """Saves the current briefing analysis to the DB and returns a Share ID."""
     if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
-    
     data = request.get_json()
-    if not data: return jsonify({'error': 'No data provided'}), 400
-    
+    if not data: return jsonify({'error': 'No data'}), 400
     share_id = str(uuid.uuid4())
-    
     if DATABASE_URL:
         try:
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
             cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(data)))
-            conn.commit()
-            cur.close()
-            conn.close()
+            conn.commit(); cur.close(); conn.close()
             return jsonify({'share_id': share_id})
-        except Exception as e:
-            print(f"DB Share Error: {e}")
-            return jsonify({'error': 'Database error'}), 500
-    else:
-        # Local Fallback (Not persistent in cloud, but good for testing)
-        return jsonify({'error': 'Sharing requires database configuration'}), 500
+        except: return jsonify({'error': 'DB error'}), 500
+    return jsonify({'error': 'DB not configured'}), 500
 
 @app.route('/api/shared/<share_id>', methods=['GET'])
 def get_shared_briefing(share_id):
-    """Retrieves a briefing by ID. Publicly accessible."""
     if DATABASE_URL:
         try:
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor(cursor_factory=RealDictCursor)
             cur.execute("SELECT data FROM shared_briefings WHERE share_id = %s", (share_id,))
-            row = cur.fetchone()
-            cur.close()
-            conn.close()
-            if row:
-                return jsonify(row['data'])
-            else:
-                return jsonify({'error': 'Briefing not found'}), 404
-        except Exception as e:
-            return jsonify({'error': 'Database error'}), 500
-    else:
-        return jsonify({'error': 'Database not configured'}), 500
+            row = cur.fetchone(); cur.close(); conn.close()
+            if row: return jsonify(row['data'])
+            return jsonify({'error': 'Not found'}), 404
+        except: return jsonify({'error': 'DB error'}), 500
+    return jsonify({'error': 'DB not configured'}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
