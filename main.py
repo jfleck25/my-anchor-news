@@ -22,7 +22,6 @@ from psycopg2.extras import RealDictCursor
 
 # --- Configuration & Constants ---
 app = flask.Flask(__name__, static_folder='.', static_url_path='')
-# Trust Render's proxy headers
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 CORS(app, supports_credentials=True)
 
@@ -38,22 +37,20 @@ SCOPES = [
 ]
 
 CLIENT_SECRETS_FILE = "client_secrets.json"
-SETTINGS_FILE = "user_settings.json" # Fallback for local dev
-CACHE_FILE = "cache.json" # Local cache (Redis is Phase 6)
+SETTINGS_FILE = "user_settings.json"
+CACHE_FILE = "cache.json"
 CACHE_TTL_SECONDS = 900 
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 # --- Database Setup (Postgres) ---
 def init_db():
-    """Creates the users table if it doesn't exist."""
     if not DATABASE_URL: 
         print(" * Running in Local Mode (No Database URL found)")
         return
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
-        # Create table to store user settings as a JSON blob
         cur.execute("""
             CREATE TABLE IF NOT EXISTS user_settings (
                 user_email VARCHAR(255) PRIMARY KEY,
@@ -67,7 +64,6 @@ def init_db():
     except Exception as e:
         print(f" * DB Init Error: {e}")
 
-# Initialize DB on startup
 init_db()
 
 # --- Helper Functions ---
@@ -81,14 +77,11 @@ def get_user_info():
     except: return None
 
 def load_settings(user_email=None):
-    """Loads settings from Postgres (if avail) or JSON file."""
-    # Default settings structure
     defaults = {
         "sources": ["wsj.com", "nytimes.com", "axios.com", "theguardian.com", "techcrunch.com"],
         "time_window_hours": 24
     }
 
-    # 1. Try Postgres
     if DATABASE_URL and user_email:
         try:
             conn = psycopg2.connect(DATABASE_URL)
@@ -98,7 +91,6 @@ def load_settings(user_email=None):
             cur.close()
             conn.close()
             if row:
-                # Merge with defaults to ensure missing keys don't break things
                 user_settings = defaults.copy()
                 user_settings.update(row['settings'])
                 return user_settings
@@ -108,21 +100,17 @@ def load_settings(user_email=None):
             print(f"DB Read Error: {e}")
             return defaults
 
-    # 2. Fallback to Local JSON (for localhost or if DB fails)
     if not os.path.exists(SETTINGS_FILE): return defaults
     try:
-        with open(SETTINGS_FILE, 'r') as f: return json.load(f)
+        with open(SETTINGS_FILE, 'r') as f:
+            return json.load(f)
     except: return defaults
 
 def save_settings(new_settings, user_email=None):
-    """Saves settings to Postgres (if avail) or JSON file."""
-    
-    # 1. Try Postgres
     if DATABASE_URL and user_email:
         try:
             conn = psycopg2.connect(DATABASE_URL)
             cur = conn.cursor()
-            # Upsert (Insert or Update)
             cur.execute("""
                 INSERT INTO user_settings (user_email, settings)
                 VALUES (%s, %s)
@@ -137,9 +125,9 @@ def save_settings(new_settings, user_email=None):
             print(f"DB Write Error: {e}")
             return False
 
-    # 2. Fallback to Local JSON
     try:
-        with open(SETTINGS_FILE, 'w') as f: json.dump(new_settings, f, indent=2)
+        with open(SETTINGS_FILE, 'w') as f:
+            json.dump(new_settings, f, indent=2)
         return True
     except: return False
 
@@ -221,13 +209,20 @@ def analyze_news_with_llm(newsletters_text):
 
 # --- Caching Helpers ---
 def load_cache():
-    if not os.path.exists(CACHE_FILE): return {}
-    try: with open(CACHE_FILE, 'r') as f: return json.load(f)
-    except: return {}
+    if not os.path.exists(CACHE_FILE):
+        return {}
+    try:
+        with open(CACHE_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return {}
 
 def save_cache(data):
-    try: with open(CACHE_FILE, 'w') as f: json.dump(data, f)
-    except: pass
+    try:
+        with open(CACHE_FILE, 'w') as f:
+            json.dump(data, f)
+    except:
+        pass
 
 def get_settings_hash(settings):
     s = json.dumps(settings, sort_keys=True)
