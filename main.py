@@ -45,25 +45,31 @@ CACHE_TTL_SECONDS = 900
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# --- PERSONA CONFIGURATION ---
+# --- PERSONA CONFIGURATION (Updated for Contrast) ---
 PERSONAS = {
     "anchor": {
-        "voice_name": "en-US-Journey-D", # Deep, warm, professional (Male)
+        "voice_name": "en-US-Journey-D", # User Favorite: Deep, warm (Male)
         "gender": texttospeech.SsmlVoiceGender.MALE,
+        "speaking_rate": 1.0,
+        "pitch": 0.0,
         "intro": ["Good morning. Here is your daily briefing.", "This is My Anchor. Let's look at the news."],
         "transition": ["Next up...", "Moving on...", "In other news...", "Turning to..."],
         "outro": "That concludes your briefing. Have a good day."
     },
     "analyst": {
-        "voice_name": "en-US-Neural2-F", # Crisp, fast, precise (Female)
-        "gender": texttospeech.SsmlVoiceGender.FEMALE,
-        "intro": ["Market update.", "Here is the data."],
+        "voice_name": "en-US-Neural2-J", # CHANGED: Serious, newscaster style (Male) to contrast with DJ
+        "gender": texttospeech.SsmlVoiceGender.MALE,
+        "speaking_rate": 1.15, # Faster, data-driven pace
+        "pitch": -2.0, # Slightly deeper authority
+        "intro": ["Market update.", "Here is the data.", "Let's look at the numbers."],
         "transition": ["Next sector:", "Analysis:", "Data point:", "Moving to:"],
         "outro": "Briefing complete."
     },
     "dj": {
         "voice_name": "en-US-Journey-F", # Expressive, dynamic (Female)
         "gender": texttospeech.SsmlVoiceGender.FEMALE,
+        "speaking_rate": 1.1, # Energetic pace
+        "pitch": 2.0, # Slightly higher energy
         "intro": ["Rise and shine! Here's what's happening.", "Yo! Let's get you caught up."],
         "transition": ["Check this out...", "Switching gears...", "And get this...", "Next story..."],
         "outro": "That's the wrap! Catch you later."
@@ -466,7 +472,7 @@ def generate_audio():
             current_chunk = sentence + " "
     if current_chunk: chunks.append(current_chunk)
     
-    # --- Configure Voice based on Persona ---
+    # --- Configure Voice based on Persona (Updated with Speed/Pitch) ---
     persona_config = PERSONAS.get(style, PERSONAS['anchor'])
     
     voice = texttospeech.VoiceSelectionParams(
@@ -475,7 +481,13 @@ def generate_audio():
         ssml_gender=persona_config['gender']
     )
     
-    audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
+    # --- UPDATE: Set speaking rate and pitch from persona config ---
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.MP3,
+        speaking_rate=persona_config.get('speaking_rate', 1.0),
+        pitch=persona_config.get('pitch', 0.0)
+    )
+    
     all_audio_content = b""
     for chunk_text in chunks:
         if len(chunk_text.encode('utf-8')) > byte_limit: chunk_text = chunk_text.encode('utf-8')[:byte_limit].decode('utf-8', 'ignore')
