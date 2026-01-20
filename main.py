@@ -23,6 +23,7 @@ from psycopg2.extras import RealDictCursor
 
 # --- Configuration & Constants ---
 app = flask.Flask(__name__, static_folder='.', static_url_path='')
+# Trust Render's proxy headers
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 CORS(app, supports_credentials=True)
 
@@ -215,11 +216,8 @@ def sanitize_for_llm(text):
     return text.replace('\\', '\\\\').replace('"', '\\"')
 
 def generate_script_from_analysis(analysis_json):
-    # Check if we should use a "Warning" intro based on the content (simple heuristic)
-    # Ideally, we'd pass the 'red_flag_mode' state here too, but this works generally.
-    intro = "Good morning. Here is your daily briefing."
+    script = "Good morning. Here is your briefing. "
     
-    script = f"{intro} "
     story_groups = analysis_json.get('story_groups', [])
     for i, group in enumerate(story_groups):
         script += f"{group.get('group_headline', '')}. {group.get('group_summary', '')}. "
@@ -246,7 +244,7 @@ def analyze_news_with_llm(newsletters_text, use_risk_mode=False):
     # Select the appropriate prompt
     base_prompt = RISK_PROMPT if use_risk_mode else STANDARD_PROMPT
     prompt = base_prompt + newsletters_text
-    
+
     try:
         generation_config = genai.types.GenerationConfig(max_output_tokens=8192, temperature=0.2)
         response = model.generate_content(prompt, generation_config=generation_config)
