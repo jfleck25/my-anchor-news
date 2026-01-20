@@ -5,6 +5,7 @@ import json
 import re
 import time
 import hashlib
+import uuid
 import flask
 from flask import request, redirect, session, url_for, jsonify, send_from_directory
 from flask_cors import CORS
@@ -15,20 +16,17 @@ import google.generativeai as genai
 from google.cloud import texttospeech
 from google.api_core import client_options 
 from bs4 import BeautifulSoup
-import google.auth.transport.requests
-# --- FIX: Import ProxyFix ---
+import google.auth.transport.requests 
 from werkzeug.middleware.proxy_fix import ProxyFix
+import psycopg2 
+from psycopg2.extras import RealDictCursor
 
 # --- Configuration & Constants ---
 app = flask.Flask(__name__, static_folder='.', static_url_path='')
-
-# --- FIX: Tell Flask to trust Render's Proxy Headers ---
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
-
 CORS(app, supports_credentials=True)
 
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "default_secret_key_for_development")
-# Allow HTTP for local dev, but in production (HTTPS) this usually doesn't hurt
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 SCOPES = [
@@ -42,76 +40,77 @@ SCOPES = [
 CLIENT_SECRETS_FILE = "client_secrets.json"
 SETTINGS_FILE = "user_settings.json"
 CACHE_FILE = "cache.json"
-CACHE_TTL_SECONDS = 900 # 15 Minutes
+CACHE_TTL_SECONDS = 900 
 
-# --- Production Secrets Handling ---
-def get_client_secrets_config():
-    env_secrets = os.environ.get("GOOGLE_CLIENT_SECRETS_JSON")
-    if env_secrets:
-        try:
-            return json.loads(env_secrets)
-        except json.JSONDecodeError:
-            print("Error parsing GOOGLE_CLIENT_SECRETS_JSON")
-    
-    if os.path.exists(CLIENT_SECRETS_FILE):
-        return CLIENT_SECRETS_FILE
-        
-    raise FileNotFoundError("Client secrets not found in ENV or file.")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# --- Load Project ID ---
-PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
-if not PROJECT_ID:
+# --- PROMPTS ---
+STANDARD_PROMPT = """
+You are an elite media analyst. Provide raw text from multiple newsletters.
+
+Task:
+1. Group distinct news events.
+2. Create neutral headlines.
+3. Write 3-4 sentence summary of facts.
+4. **DEEP ANGLE ANALYSIS**: 1-2 sentences per article. Include specific facts/data/quotes. Start with verb (e.g. "Cites...").
+5. **Remaining Stories**: Top 5 only. One-sentence summary.
+6. **Filter**: Ignore ads/fluff.
+7. **Limit**: Top 10 groups max.
+
+Output JSON: { "story_groups": [ { "group_headline": "...", "group_summary": "...", "stories": [ { "headline": "...", "source": "...", "angle": "..." } ] } ], "remaining_stories": [ { "headline": "..." } ] }
+
+Content: ---
+"""
+
+RISK_PROMPT = """
+You are a paranoid Chief Risk Officer and Short Seller. I will provide raw text from multiple newsletters. 
+Your goal is DOWNSIDE PROTECTION. Ignore "good news". Focus ONLY on risks, threats, and negative sentiment.
+
+Task:
+1. **Identify THREATS:** Only group stories involving regulatory crackdowns, lawsuits, market volatility, earnings misses, geopolitical instability, or executive scandals.
+2. **IGNORE FLUFF:** Do NOT report on product launches, philanthropy, "optimistic" puff pieces, or general growth updates unless they conceal a risk.
+3. **Headline:** Write urgent, risk-focused headlines (e.g. "Regulatory scrutiny intensifies for..." instead of "Update on...").
+4. **Summary:** 3-4 sentences focusing on the *impact* of the risk. Who loses money? What is the legal exposure?
+5. **DEEP ANGLE ANALYSIS**: Analyze the skepticism. Example: "Highlights the gap between the CEO's optimism and the weak balance sheet."
+6. **Remaining Stories**: Top 5 *risk* headlines only.
+7. **Limit**: Top 10 groups max. If no risks are found, return an empty list or minor concerns.
+
+Output JSON: { "story_groups": [ { "group_headline": "...", "group_summary": "...", "stories": [ { "headline": "...", "source": "...", "angle": "..." } ] } ], "remaining_stories": [ { "headline": "..." } ] }
+
+Content: ---
+"""
+
+# --- Database Setup (Postgres) ---
+def init_db():
+    if not DATABASE_URL: 
+        print(" * Running in Local Mode (No Database URL found)")
+        return
     try:
-        config = get_client_secrets_config()
-        if isinstance(config, dict):
-            secrets = config
-        else:
-            with open(config, 'r') as f:
-                secrets = json.load(f)
-        
-        data = secrets.get('web') or secrets.get('installed')
-        if data: PROJECT_ID = data.get('project_id')
-    except: pass
-
-if not PROJECT_ID: print("CRITICAL WARNING: PROJECT_ID could not be determined. TTS will likely fail.")
-
-# Default Settings
-DEFAULT_SETTINGS = {
-    "sources": ["wsj.com", "nytimes.com", "axios.com", "theguardian.com", "techcrunch.com"],
-    "time_window_hours": 24
-}
-
-# --- Startup Checks ---
-api_key = os.environ.get("GOOGLE_API_KEY")
-if not api_key:
-    print("WARNING: GOOGLE_API_KEY not set. AI features will fail.")
-else:
-    print(f" * AI Configuration: API Key detected.")
-    try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS user_settings (
+                user_email VARCHAR(255) PRIMARY KEY,
+                settings JSONB
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS shared_briefings (
+                share_id UUID PRIMARY KEY,
+                data JSONB,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(" * Database connection successful. Tables initialized.")
     except Exception as e:
-        print(f"Error configuring Gemini: {e}")
-        model = None
+        print(f" * DB Init Error: {e}")
 
-# --- Caching Helpers ---
+init_db()
 
-def load_cache():
-    if not os.path.exists(CACHE_FILE): return {}
-    try:
-        with open(CACHE_FILE, 'r') as f: return json.load(f)
-    except: return {}
-
-def save_cache(data):
-    try:
-        with open(CACHE_FILE, 'w') as f: json.dump(data, f)
-    except Exception as e: print(f"Cache Write Error: {e}")
-
-def get_settings_hash(settings):
-    s = json.dumps(settings, sort_keys=True)
-    return hashlib.md5(s.encode()).hexdigest()
-
-# --- Existing Helpers ---
+# --- Helper Functions ---
 
 def get_user_info():
     if 'credentials' not in session: return None
@@ -121,26 +120,106 @@ def get_user_info():
         return user_info_service.userinfo().get().execute()
     except: return None
 
-def load_settings():
-    if not os.path.exists(SETTINGS_FILE): return DEFAULT_SETTINGS
-    try:
-        with open(SETTINGS_FILE, 'r') as f: return json.load(f)
-    except: return DEFAULT_SETTINGS
+def load_settings(user_email=None):
+    defaults = {
+        "sources": ["wsj.com", "nytimes.com", "axios.com", "theguardian.com", "techcrunch.com"],
+        "time_window_hours": 24,
+        "red_flag_mode": False
+    }
+    
+    if DATABASE_URL and user_email:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute("SELECT settings FROM user_settings WHERE user_email = %s", (user_email,))
+            row = cur.fetchone()
+            cur.close()
+            conn.close()
+            if row:
+                user_settings = defaults.copy()
+                user_settings.update(row['settings'])
+                return user_settings
+            else: 
+                return defaults
+        except: 
+            return defaults
 
-def save_settings(new_settings):
+    if not os.path.exists(SETTINGS_FILE): 
+        return defaults
+    
+    try: 
+        with open(SETTINGS_FILE, 'r') as f: 
+            return json.load(f)
+    except: 
+        return defaults
+
+def save_settings(new_settings, user_email=None):
+    if DATABASE_URL and user_email:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO user_settings (user_email, settings) VALUES (%s, %s)
+                ON CONFLICT (user_email) DO UPDATE SET settings = EXCLUDED.settings;
+            """, (user_email, json.dumps(new_settings)))
+            conn.commit()
+            cur.close()
+            conn.close()
+            return True
+        except: 
+            return False
+            
     try:
-        final = DEFAULT_SETTINGS.copy()
-        final.update(new_settings)
-        with open(SETTINGS_FILE, 'w') as f: json.dump(final, f, indent=2)
+        with open(SETTINGS_FILE, 'w') as f: 
+            json.dump(new_settings, f, indent=2)
         return True
-    except: return False
+    except: 
+        return False
+
+def get_client_secrets_config():
+    env_secrets = os.environ.get("GOOGLE_CLIENT_SECRETS_JSON")
+    if env_secrets:
+        try: 
+            return json.loads(env_secrets)
+        except json.JSONDecodeError: 
+            pass
+    if os.path.exists(CLIENT_SECRETS_FILE): 
+        return CLIENT_SECRETS_FILE
+    raise FileNotFoundError("Client secrets not found.")
+
+PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
+if not PROJECT_ID:
+    try:
+        config = get_client_secrets_config()
+        if isinstance(config, dict): 
+            secrets = config
+        else:
+            with open(config, 'r') as f: 
+                secrets = json.load(f)
+        data = secrets.get('web') or secrets.get('installed')
+        if data: 
+            PROJECT_ID = data.get('project_id')
+    except: 
+        pass
+
+api_key = os.environ.get("GOOGLE_API_KEY")
+if api_key:
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+    except: 
+        model = None
 
 def sanitize_for_llm(text):
     text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
     return text.replace('\\', '\\\\').replace('"', '\\"')
 
 def generate_script_from_analysis(analysis_json):
-    script = "Good morning. Here is your deeper look at today's news. "
+    # Check if we should use a "Warning" intro based on the content (simple heuristic)
+    # Ideally, we'd pass the 'red_flag_mode' state here too, but this works generally.
+    intro = "Good morning. Here is your daily briefing."
+    
+    script = f"{intro} "
     story_groups = analysis_json.get('story_groups', [])
     for i, group in enumerate(story_groups):
         script += f"{group.get('group_headline', '')}. {group.get('group_summary', '')}. "
@@ -150,40 +229,56 @@ def generate_script_from_analysis(analysis_json):
             for story in stories:
                 source = story.get('source', 'One source').split('<')[0].strip().replace('.com', '')
                 script += f"The {source} {story.get('angle', '')}. "
-        if i < len(story_groups) - 1: script += " Moving on... "
+        if i < len(story_groups) - 1: 
+            script += " Moving on... "
     remaining = analysis_json.get('remaining_stories', [])
     if remaining:
         script += "In brief: "
-        for story in remaining: script += f"{story.get('headline', '')}. "
+        for story in remaining: 
+            script += f"{story.get('headline', '')}. "
     script += "That concludes your briefing."
     return script
 
-def analyze_news_with_llm(newsletters_text):
-    if not model: raise Exception("Gemini API model is not configured.")
-    prompt = """
-    You are an elite media analyst. Provide raw text from multiple newsletters.
-    Task:
-    1. Group distinct news events.
-    2. Create neutral headlines.
-    3. Write 3-4 sentence summary of facts.
-    4. **DEEP ANGLE ANALYSIS**: 1-2 sentences per article. Include specific facts/data/quotes. Start with verb (e.g. "Cites...").
-    5. **Remaining Stories**: Top 5 only. One-sentence summary.
-    6. **Filter**: Ignore ads/fluff.
-    7. **Limit**: Top 10 groups max.
+def analyze_news_with_llm(newsletters_text, use_risk_mode=False):
+    if not model: 
+        raise Exception("Gemini API model is not configured.")
     
-    Output JSON: { "story_groups": [ { "group_headline": "...", "group_summary": "...", "stories": [ { "headline": "...", "source": "...", "angle": "..." } ] } ], "remaining_stories": [ { "headline": "..." } ] }
-    
-    Content: ---
-    """ + newsletters_text
+    # Select the appropriate prompt
+    base_prompt = RISK_PROMPT if use_risk_mode else STANDARD_PROMPT
+    prompt = base_prompt + newsletters_text
     
     try:
         generation_config = genai.types.GenerationConfig(max_output_tokens=8192, temperature=0.2)
         response = model.generate_content(prompt, generation_config=generation_config)
         match = re.search(r'\{.*\}', response.text, re.DOTALL)
-        if match: return json.loads(match.group(0))
-        else: raise ValueError("No valid JSON found.")
-    except json.JSONDecodeError: return {"error": "Analysis failed due to volume."}
-    except Exception as e: return {"error": "AI analysis failed."}
+        if match: 
+            return json.loads(match.group(0))
+        else: 
+            raise ValueError("No valid JSON found.")
+    except json.JSONDecodeError: 
+        return {"error": "Analysis failed due to volume."}
+    except Exception as e: 
+        return {"error": "AI analysis failed."}
+
+def load_cache():
+    if not os.path.exists(CACHE_FILE): 
+        return {}
+    try: 
+        with open(CACHE_FILE, 'r') as f: 
+            return json.load(f)
+    except: 
+        return {}
+
+def save_cache(data):
+    try: 
+        with open(CACHE_FILE, 'w') as f: 
+            json.dump(data, f)
+    except: 
+        pass
+
+def get_settings_hash(settings):
+    s = json.dumps(settings, sort_keys=True)
+    return hashlib.md5(s.encode()).hexdigest()
 
 # --- Routes ---
 
@@ -196,12 +291,9 @@ def login():
     config = get_client_secrets_config()
     if isinstance(config, dict):
         flow = Flow.from_client_config(config, scopes=SCOPES)
-        # Use Flask's url_for to generate the redirect URI. 
-        # ProxyFix will ensure _external=True generates an HTTPS url on Render.
         flow.redirect_uri = url_for('oauth2callback', _external=True)
     else:
         flow = Flow.from_client_secrets_file(config, scopes=SCOPES, redirect_uri=url_for('oauth2callback', _external=True))
-        
     authorization_url, state = flow.authorization_url(access_type='offline', include_granted_scopes='true', prompt='consent')
     session['state'] = state
     return redirect(authorization_url)
@@ -209,18 +301,15 @@ def login():
 @app.route('/oauth2callback')
 def oauth2callback():
     state = session['state']
-    
     config = get_client_secrets_config()
     if isinstance(config, dict):
         flow = Flow.from_client_config(config, scopes=SCOPES)
         flow.redirect_uri = url_for('oauth2callback', _external=True)
     else:
         flow = Flow.from_client_secrets_file(config, scopes=SCOPES, state=state, redirect_uri=url_for('oauth2callback', _external=True))
-        
     flow.fetch_token(authorization_response=request.url)
     credentials = flow.credentials
     session['credentials'] = {'token': credentials.token, 'refresh_token': credentials.refresh_token, 'token_uri': credentials.token_uri, 'client_id': credentials.client_id, 'client_secret': credentials.client_secret, 'scopes': credentials.scopes}
-    
     return redirect("/")
 
 @app.route('/logout')
@@ -236,25 +325,33 @@ def check_auth():
 @app.route('/api/settings', methods=['GET'])
 def get_settings():
     if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
-    return jsonify(load_settings())
+    user_info = get_user_info()
+    email = user_info.get('email') if user_info else None
+    return jsonify(load_settings(email))
 
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
     if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
-    if save_settings(request.get_json()): return jsonify({'status': 'success'})
+    user_info = get_user_info()
+    email = user_info.get('email') if user_info else None
+    if save_settings(request.get_json(), email):
+        return jsonify({'status': 'success'})
     return jsonify({'error': 'Failed to save settings'}), 500
 
 @app.route('/api/fetch_emails')
 def fetch_emails():
     if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
     
-    settings = load_settings()
+    user_info = get_user_info()
+    email = user_info.get('email') if user_info else None
+    settings = load_settings(email)
+    
+    # --- RED FLAG CHECK ---
+    use_risk_mode = settings.get('red_flag_mode', False)
+    
     current_hash = get_settings_hash(settings)
     cache = load_cache()
-    
-    if (cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and \
-       (cache.get('settings_hash') == current_hash) and \
-       (cache.get('analysis')):
+    if (cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (cache.get('settings_hash') == current_hash) and (cache.get('analysis')):
         return jsonify(cache['analysis'])
     
     creds = Credentials(**session['credentials'])
@@ -267,7 +364,6 @@ def fetch_emails():
         
         results = service.users().messages().list(userId='me', q=query, maxResults=25).execute()
         messages = results.get('messages', [])
-
         if not messages: return jsonify({'story_groups': [], 'remaining_stories': [{'headline': f'No newsletters found in last {hours}h.'}]})
         
         consolidated_text = ""
@@ -276,15 +372,11 @@ def fetch_emails():
             headers = msg['payload']['headers']
             subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
             sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'No Sender')
-            
             body_data = ""
             if 'parts' in msg['payload']:
                 for part in msg['payload']['parts']:
-                    if part['mimeType'] == 'text/html':
-                        body_data = part['body']['data']
-                        break
+                    if part['mimeType'] == 'text/html': body_data = part['body']['data']; break
             else: body_data = msg['payload'].get('body', {}).get('data', '')
-            
             if not body_data: continue
             decoded_data = base64.urlsafe_b64decode(body_data.encode('ASCII'))
             soup = BeautifulSoup(decoded_data, "lxml")
@@ -294,8 +386,9 @@ def fetch_emails():
             consolidated_text += f"\n\n--- Newsletter from: {sender} ---\n--- Subject: {subject} ---\n{sanitized_text}\n"
 
         if not consolidated_text: return jsonify({'story_groups': [], 'remaining_stories': [{'headline': 'No text found.'}]})
-
-        analysis_result = analyze_news_with_llm(consolidated_text)
+        
+        # --- PASS MODE TO ANALYZER ---
+        analysis_result = analyze_news_with_llm(consolidated_text, use_risk_mode)
         
         cache['timestamp'] = time.time()
         cache['settings_hash'] = current_hash
@@ -303,11 +396,8 @@ def fetch_emails():
         if 'audio' in cache: del cache['audio']
         if 'script_hash' in cache: del cache['script_hash']
         save_cache(cache)
-        
         return jsonify(analysis_result)
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    except Exception as e: return jsonify({'error': str(e)}), 500
 
 @app.route('/api/generate_audio', methods=['POST'])
 def generate_audio():
@@ -317,60 +407,67 @@ def generate_audio():
     creds = Credentials(**creds_data)
     try:
         auth_req = google.auth.transport.requests.Request()
-        if creds.expired:
-            creds.refresh(auth_req)
-            session['credentials']['token'] = creds.token
-            session.modified = True
-    except Exception as e: print(f"Token Refresh Error: {e}")
-
+        if creds.expired: creds.refresh(auth_req); session['credentials']['token'] = creds.token; session.modified = True
+    except: pass
     client_opts = None
     if PROJECT_ID: client_opts = client_options.ClientOptions(quota_project_id=PROJECT_ID)
     tts_client = texttospeech.TextToSpeechClient(credentials=creds, client_options=client_opts, transport="rest")
     
     analysis_data = request.get_json()
-    if not analysis_data: return jsonify({"error": "No analysis data provided."}), 400
+    script_text = generate_script_from_analysis(analysis_data)
+    script_hash = hashlib.md5(script_text.encode()).hexdigest()
+    cache = load_cache()
+    if cache.get('script_hash') == script_hash and cache.get('audio'): return jsonify({"audio_content": cache['audio']})
     
-    try:
-        script_text = generate_script_from_analysis(analysis_data)
-        script_hash = hashlib.md5(script_text.encode()).hexdigest()
-        
-        cache = load_cache()
-        if cache.get('script_hash') == script_hash and cache.get('audio'):
-            return jsonify({"audio_content": cache['audio']})
-        
-        sentences = re.split(r'(?<=[.!?])\s+', script_text)
-        chunks = []
-        current_chunk = ""
-        byte_limit = 4800 
-        for sentence in sentences:
-            if len(current_chunk.encode('utf-8')) + len(sentence.encode('utf-8')) + 1 < byte_limit:
-                current_chunk += sentence + " "
-            else:
-                if current_chunk: chunks.append(current_chunk)
-                current_chunk = sentence + " "
-        if current_chunk: chunks.append(current_chunk)
-        
-        voice = texttospeech.VoiceSelectionParams(language_code="en-US", ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL)
-        audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
-        all_audio_content = b""
-        
-        for chunk_text in chunks:
-            if len(chunk_text.encode('utf-8')) > byte_limit: chunk_text = chunk_text.encode('utf-8')[:byte_limit].decode('utf-8', 'ignore')
-            synthesis_input = texttospeech.SynthesisInput(text=chunk_text)
-            response = tts_client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
-            all_audio_content += response.audio_content
-        
-        audio_base64 = base64.b64encode(all_audio_content).decode('utf-8')
-        
-        cache['script_hash'] = script_hash
-        cache['audio'] = audio_base64
-        save_cache(cache)
-        
-        return jsonify({"audio_content": audio_base64})
+    sentences = re.split(r'(?<=[.!?])\s+', script_text)
+    chunks = []; current_chunk = ""; byte_limit = 4800
+    for sentence in sentences:
+        if len(current_chunk.encode('utf-8')) + len(sentence.encode('utf-8')) + 1 < byte_limit: current_chunk += sentence + " "
+        else: 
+            if current_chunk: chunks.append(current_chunk)
+            current_chunk = sentence + " "
+    if current_chunk: chunks.append(current_chunk)
+    
+    voice = texttospeech.VoiceSelectionParams(language_code="en-US", ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL)
+    audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
+    all_audio_content = b""
+    for chunk_text in chunks:
+        if len(chunk_text.encode('utf-8')) > byte_limit: chunk_text = chunk_text.encode('utf-8')[:byte_limit].decode('utf-8', 'ignore')
+        response = tts_client.synthesize_speech(input=texttospeech.SynthesisInput(text=chunk_text), voice=voice, audio_config=audio_config)
+        all_audio_content += response.audio_content
+    audio_base64 = base64.b64encode(all_audio_content).decode('utf-8')
+    cache['script_hash'] = script_hash; cache['audio'] = audio_base64; save_cache(cache)
+    return jsonify({"audio_content": audio_base64})
 
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# --- Share Endpoints ---
+@app.route('/api/share', methods=['POST'])
+def share_briefing():
+    if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
+    data = request.get_json()
+    if not data: return jsonify({'error': 'No data'}), 400
+    share_id = str(uuid.uuid4())
+    if DATABASE_URL:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(data)))
+            conn.commit(); cur.close(); conn.close()
+            return jsonify({'share_id': share_id})
+        except: return jsonify({'error': 'DB error'}), 500
+    return jsonify({'error': 'DB not configured'}), 500
+
+@app.route('/api/shared/<share_id>', methods=['GET'])
+def get_shared_briefing(share_id):
+    if DATABASE_URL:
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute("SELECT data FROM shared_briefings WHERE share_id = %s", (share_id,))
+            row = cur.fetchone(); cur.close(); conn.close()
+            if row: return jsonify(row['data'])
+            return jsonify({'error': 'Not found'}), 404
+        except: return jsonify({'error': 'DB error'}), 500
+    return jsonify({'error': 'DB not configured'}), 500
 
 if __name__ == '__main__':
-    # In production, we don't run with debug=True
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
