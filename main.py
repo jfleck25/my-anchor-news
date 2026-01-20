@@ -6,6 +6,7 @@ import re
 import time
 import hashlib
 import uuid
+import random
 import flask
 from flask import request, redirect, session, url_for, jsonify, send_from_directory
 from flask_cors import CORS
@@ -23,7 +24,6 @@ from psycopg2.extras import RealDictCursor
 
 # --- Configuration & Constants ---
 app = flask.Flask(__name__, static_folder='.', static_url_path='')
-# Trust Render's proxy headers
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 CORS(app, supports_credentials=True)
 
@@ -44,6 +44,31 @@ CACHE_FILE = "cache.json"
 CACHE_TTL_SECONDS = 900 
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
+
+# --- PERSONA CONFIGURATION ---
+PERSONAS = {
+    "anchor": {
+        "voice_name": "en-US-Journey-D", # Deep, warm, professional (Male)
+        "gender": texttospeech.SsmlVoiceGender.MALE,
+        "intro": ["Good morning. Here is your daily briefing.", "This is My Anchor. Let's look at the news."],
+        "transition": ["Next up...", "Moving on...", "In other news...", "Turning to..."],
+        "outro": "That concludes your briefing. Have a good day."
+    },
+    "analyst": {
+        "voice_name": "en-US-Neural2-F", # Crisp, fast, precise (Female)
+        "gender": texttospeech.SsmlVoiceGender.FEMALE,
+        "intro": ["Market update.", "Here is the data."],
+        "transition": ["Next sector:", "Analysis:", "Data point:", "Moving to:"],
+        "outro": "Briefing complete."
+    },
+    "dj": {
+        "voice_name": "en-US-Journey-F", # Expressive, dynamic (Female)
+        "gender": texttospeech.SsmlVoiceGender.FEMALE,
+        "intro": ["Rise and shine! Here's what's happening.", "Yo! Let's get you caught up."],
+        "transition": ["Check this out...", "Switching gears...", "And get this...", "Next story..."],
+        "outro": "That's the wrap! Catch you later."
+    }
+}
 
 # --- Database Setup (Postgres) ---
 def init_db():
@@ -88,7 +113,8 @@ def get_user_info():
 def load_settings(user_email=None):
     defaults = {
         "sources": ["wsj.com", "nytimes.com", "axios.com", "theguardian.com", "techcrunch.com"],
-        "time_window_hours": 24
+        "time_window_hours": 24,
+        "personality": "anchor" # Default persona
     }
     
     if DATABASE_URL and user_email:
@@ -178,26 +204,36 @@ def sanitize_for_llm(text):
     text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
     return text.replace('\\', '\\\\').replace('"', '\\"')
 
-def generate_script_from_analysis(analysis_json):
-    script = "Good morning. Here is your briefing. "
+def generate_script_from_analysis(analysis_json, style="anchor"):
+    """
+    Converts JSON to script, adapting intro/transitions based on 'style'.
+    """
+    persona = PERSONAS.get(style, PERSONAS["anchor"])
+    
+    # Randomize intro to keep it fresh
+    script = f"{random.choice(persona['intro'])} "
     
     story_groups = analysis_json.get('story_groups', [])
     for i, group in enumerate(story_groups):
         script += f"{group.get('group_headline', '')}. {group.get('group_summary', '')}. "
+        
         stories = group.get('stories', [])
         if len(stories) > 1:
-            script += "Here is how the coverage differs: "
+            script += "Perspectives: "
             for story in stories:
                 source = story.get('source', 'One source').split('<')[0].strip().replace('.com', '')
                 script += f"The {source} {story.get('angle', '')}. "
+        
         if i < len(story_groups) - 1: 
-            script += " Moving on... "
+            script += f" {random.choice(persona['transition'])} "
+            
     remaining = analysis_json.get('remaining_stories', [])
     if remaining:
-        script += "In brief: "
+        script += "Briefly: "
         for story in remaining: 
             script += f"{story.get('headline', '')}. "
-    script += "That concludes your briefing."
+            
+    script += f" {persona['outro']}"
     return script
 
 def analyze_news_with_llm(newsletters_text):
@@ -394,6 +430,12 @@ def fetch_emails():
 def generate_audio():
     if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
     
+    # --- Load Settings to get Persona ---
+    user_info = get_user_info()
+    email = user_info.get('email') if user_info else None
+    settings = load_settings(email)
+    style = settings.get('personality', 'anchor')
+    
     creds_data = session['credentials']
     creds = Credentials(**creds_data)
     try:
@@ -405,8 +447,13 @@ def generate_audio():
     tts_client = texttospeech.TextToSpeechClient(credentials=creds, client_options=client_opts, transport="rest")
     
     analysis_data = request.get_json()
-    script_text = generate_script_from_analysis(analysis_data)
-    script_hash = hashlib.md5(script_text.encode()).hexdigest()
+    
+    # --- Pass Style to Script Generator ---
+    script_text = generate_script_from_analysis(analysis_data, style)
+    
+    # Hash includes style so we cache different voices separately
+    script_hash = hashlib.md5((script_text + style).encode()).hexdigest()
+    
     cache = load_cache()
     if cache.get('script_hash') == script_hash and cache.get('audio'): return jsonify({"audio_content": cache['audio']})
     
@@ -419,7 +466,15 @@ def generate_audio():
             current_chunk = sentence + " "
     if current_chunk: chunks.append(current_chunk)
     
-    voice = texttospeech.VoiceSelectionParams(language_code="en-US", ssml_gender=texttospeech.SsmlVoiceGender.NEUTRAL)
+    # --- Configure Voice based on Persona ---
+    persona_config = PERSONAS.get(style, PERSONAS['anchor'])
+    
+    voice = texttospeech.VoiceSelectionParams(
+        language_code="en-US", 
+        name=persona_config['voice_name'],
+        ssml_gender=persona_config['gender']
+    )
+    
     audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3)
     all_audio_content = b""
     for chunk_text in chunks:
