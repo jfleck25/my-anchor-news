@@ -88,8 +88,8 @@
 
         // --- Component: Settings Modal ---
         const SettingsModal = ({ isOpen, onClose, currentSettings, onSave }) => {
-            // FIX: Removed early return "if (!isOpen) return null;" to prevent Hook errors. 
-            // We now control visibility by conditionally rendering this component in the parent.
+            // Note: We depend on the parent unmounting/remounting this component to reset state
+            // when it opens. This is handled by the conditional rendering in Dashboard.
 
             const [sources, setSources] = React.useState(currentSettings.sources || []);
             const [timeWindow, setTimeWindow] = React.useState(currentSettings.time_window_hours || 24);
@@ -377,7 +377,7 @@
                         </div>
                     </nav>
                     
-                    {!sharedData && isSettingsOpen && ( // FIX: Conditional Rendering here
+                    {!sharedData && isSettingsOpen && ( // FIX: Conditional Rendering logic applied
                         <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} currentSettings={settings} onSave={handleSaveSettings} />
                     )}
 
