@@ -46,7 +46,7 @@
         .dark .glass {
             background: rgba(15, 23, 42, 0.7);
         }
-        /* Toggle Switch */
+        /* Toggle Switch CSS */
         .toggle-checkbox:checked {
             right: 0;
             border-color: #ef4444;
@@ -54,12 +54,17 @@
         .toggle-checkbox:checked + .toggle-label {
             background-color: #ef4444;
         }
+        /* Hide scrollbar for clean UI */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-200">
     <div id="root"></div>
 
-    <!-- React Dependencies -->
+    <!-- React Dependencies (Crossorigin added for safety) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -207,11 +212,31 @@
             );
         };
 
-        // ... (Remaining Components: LoginPage, LoadingState, Dashboard, App - UNCHANGED) ...
-        // To keep the file block short, I am including only the modified SettingsModal and necessary setup.
-        // You should essentially paste the SettingsModal above into your existing index.html, replacing the old one.
-        // Or, use the FULL block below if you want to replace the whole file to be safe.
+        // --- Component: Login Page ---
+        const LoginPage = () => (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
+                <div className="z-10 w-full max-w-md p-8">
+                    <div className="text-center mb-10">
+                        <div className="w-16 h-16 bg-brand-600 rounded-2xl mx-auto flex items-center justify-center shadow-2xl shadow-brand-500/30 mb-6 rotate-3">
+                            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 12h6m-1 8h.01" /></svg>
+                        </div>
+                        <h1 className="text-4xl font-serif font-bold text-slate-900 dark:text-white mb-3">My Anchor</h1>
+                        <p className="text-slate-500 dark:text-slate-400 text-lg">Your personalized AI news analyst.</p>
+                    </div>
+                    
+                    <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700">
+                        <a href={`${backendUrl}/login`} className="flex items-center justify-center w-full py-3.5 px-4 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-700 dark:text-white bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 transition-all duration-200 gap-3 font-medium">
+                            <svg className="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                            Continue with Google
+                        </a>
+                        <p className="mt-6 text-center text-xs text-slate-400">By continuing, you agree to allow My Anchor to access your Gmail for analysis purposes only.</p>
+                    </div>
+                </div>
+            </div>
+        );
 
+        // --- Component: Loading State ---
         const LoadingState = ({ text }) => (
             <div className="flex flex-col items-center justify-center py-20 animate-pulse">
                 <div className="w-16 h-16 bg-slate-200 dark:bg-slate-700 rounded-full mb-4 relative">
@@ -225,6 +250,7 @@
             </div>
         );
 
+        // --- Component: Dashboard ---
         const Dashboard = ({ userInfo, sharedData }) => {
             const [analysis, setAnalysis] = React.useState(sharedData || null);
             const [audioSrc, setAudioSrc] = React.useState(null);
@@ -320,6 +346,7 @@
             
             return (
                 <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-32">
+                    {/* Header */}
                     <nav className="glass sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800">
                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                             <div className="flex justify-between h-16">
@@ -354,6 +381,8 @@
                     )}
 
                     <main className="py-8 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
+                        
+                        {/* Control Bar (Hidden in Shared Mode unless we add features later) */}
                         {!sharedData && (
                             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-10 bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700">
                                 <div>
@@ -361,16 +390,23 @@
                                     <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
                                 </div>
                                 <div className="flex gap-3">
+                                    {/* Share Button */}
                                     {analysis && (
-                                        <button onClick={handleShare} className="p-3 text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors relative" title="Share Briefing">
+                                        <button 
+                                            onClick={handleShare}
+                                            className="p-3 text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors relative"
+                                            title="Share Briefing"
+                                        >
                                             {shareUrl ? <Icons.Check /> : <Icons.Share />}
                                             {shareUrl && <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs py-1 px-2 rounded opacity-100 transition-opacity">Copied!</span>}
                                         </button>
                                     )}
+
                                     <button onClick={handleFetchAndAnalyze} disabled={isFetching || isGeneratingAudio} className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-white font-medium rounded-xl hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none disabled:opacity-50 transition-all shadow-sm">
                                         <Icons.Refresh />
                                         {isFetching ? 'Scanning...' : 'Refresh'}
                                     </button>
+                                    
                                     {analysis && (
                                         <button onClick={handleGenerateAudio} disabled={isGeneratingAudio || isFetching} className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-brand-600 to-indigo-600 text-white font-bold rounded-xl hover:opacity-90 focus:outline-none disabled:opacity-50 shadow-lg shadow-brand-500/30 transition-all transform hover:scale-105">
                                             {isGeneratingAudio ? 'Synthesizing...' : <><Icons.Play /> Play Briefing</>}
@@ -382,6 +418,7 @@
 
                         {error && <div className="mb-8 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400">{error}</div>}
 
+                        {/* Content Area */}
                         {isFetching ? (
                             <LoadingState text="Scanning your inbox and analyzing key stories..." />
                         ) : analysis ? (
@@ -434,6 +471,7 @@
                         )}
                     </main>
 
+                    {/* Fixed Audio Player */}
                     {audioSrc && !sharedData && (
                         <div className="fixed bottom-0 left-0 right-0 glass border-t border-slate-200 dark:border-slate-800 p-4 shadow-2xl z-50 animate-[slideUp_0.3s_ease-out]">
                             <div className="max-w-5xl mx-auto flex items-center gap-4">
@@ -454,9 +492,50 @@
             );
         };
 
+        // --- Main App Entry ---
+        const App = () => {
+            const [userInfo, setUserInfo] = React.useState(null);
+            const [sharedData, setSharedData] = React.useState(null);
+            const [isLoading, setIsLoading] = React.useState(true);
+
+            React.useEffect(() => {
+                const init = async () => {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const shareId = urlParams.get('share');
+
+                    if (shareId) {
+                        try {
+                            const res = await fetch(`${backendUrl}/api/shared/${shareId}`);
+                            if (res.ok) setSharedData(await res.json());
+                        } catch (e) { console.error("Share Fetch Error:", e); }
+                        setIsLoading(false);
+                    } else {
+                        try {
+                            const res = await fetch(`${backendUrl}/api/check_auth`, { credentials: 'include' });
+                            // Safely handle non-JSON responses (which cause syntax errors)
+                            if (res.ok) {
+                                try {
+                                    const data = await res.json();
+                                    if (data.logged_in) setUserInfo(data.user);
+                                } catch (e) { console.error("Invalid JSON response", e); }
+                            }
+                        } catch (error) { console.error("Auth Check Failed:", error); } 
+                        finally { setIsLoading(false); }
+                    }
+                };
+                init();
+            }, []);
+
+            if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900"><p className="text-slate-500">Loading...</p></div>;
+            if (sharedData) return <Dashboard userInfo={{name: "Guest"}} sharedData={sharedData} />;
+            return userInfo ? <Dashboard userInfo={userInfo} /> : <LoginPage />;
+        };
+        
         const container = document.getElementById('root');
-        const root = ReactDOM.createRoot(container);
-        root.render(<App />);
+        if (container) {
+            const root = ReactDOM.createRoot(container);
+            root.render(<App />);
+        }
     </script>
 </body>
 </html>
