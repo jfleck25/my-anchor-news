@@ -22,6 +22,13 @@
                             600: '#0284c7',
                             700: '#0369a1',
                             900: '#0c4a6e',
+                        },
+                        danger: {
+                            50: '#fef2f2',
+                            100: '#fee2e2',
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            700: '#b91c1c',
                         }
                     }
                 }
@@ -38,6 +45,14 @@
         }
         .dark .glass {
             background: rgba(15, 23, 42, 0.7);
+        }
+        /* Toggle Switch CSS */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #ef4444;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #ef4444;
         }
         /* Hide scrollbar for clean UI */
         ::-webkit-scrollbar { width: 8px; }
@@ -66,8 +81,10 @@
             Play: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
             Refresh: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>,
             Share: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>,
+            Copy: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
             Check: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
-            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
+            Alert: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         };
 
         // --- Component: Settings Modal ---
@@ -214,10 +231,14 @@
             const [isGeneratingAudio, setIsGeneratingAudio] = React.useState(false);
             const [isSharing, setIsSharing] = React.useState(false);
             const [shareUrl, setShareUrl] = React.useState(null);
+            const [copySuccess, setCopySuccess] = React.useState(false); // --- New State for Copy Feedback
+            const [playbackRate, setPlaybackRate] = React.useState(1.0); // --- New State for Speed
             const [error, setError] = React.useState(null);
             const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
             const [settings, setSettings] = React.useState({});
             const [darkMode, setDarkMode] = React.useState(false);
+
+            const audioRef = React.useRef(null); // --- New Ref for Audio Control
 
             React.useEffect(() => {
                 if (window.matchMedia('(prefers-color-scheme: dark)').matches) setDarkMode(true);
@@ -227,6 +248,13 @@
                 if (darkMode) document.documentElement.classList.add('dark');
                 else document.documentElement.classList.remove('dark');
             }, [darkMode]);
+
+            React.useEffect(() => {
+                // Ensure playback rate is applied whenever audioSrc changes
+                if (audioRef.current) {
+                    audioRef.current.playbackRate = playbackRate;
+                }
+            }, [audioSrc, playbackRate]);
 
             React.useEffect(() => {
                 if (!sharedData) { 
@@ -299,6 +327,46 @@
                 } catch (e) { console.error("Share error:", e); }
                 finally { setIsSharing(false); }
             };
+
+            // --- Feature: Executive Summary Export ---
+            const handleCopySummary = () => {
+                if (!analysis) return;
+                
+                const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                let text = `Morning Briefing - ${today}\n\n`;
+
+                if (analysis.story_groups) {
+                    analysis.story_groups.forEach(group => {
+                        text += `**${group.group_headline}**\n${group.group_summary}\n`;
+                        if (group.stories) {
+                            group.stories.forEach(story => {
+                                text += `* [${story.source}]: ${story.angle}\n`;
+                            });
+                        }
+                        text += `\n`;
+                    });
+                }
+
+                if (analysis.remaining_stories && analysis.remaining_stories.length > 0) {
+                    text += `**In Brief:**\n`;
+                    analysis.remaining_stories.forEach(story => {
+                        text += `* ${story.headline}\n`;
+                    });
+                }
+
+                navigator.clipboard.writeText(text).then(() => {
+                    setCopySuccess(true);
+                    setTimeout(() => setCopySuccess(false), 3000);
+                });
+            };
+
+            // --- Feature: Speed Control ---
+            const handleToggleSpeed = () => {
+                const speeds = [1.0, 1.25, 1.5, 2.0];
+                const currentIndex = speeds.indexOf(playbackRate);
+                const nextSpeed = speeds[(currentIndex + 1) % speeds.length];
+                setPlaybackRate(nextSpeed);
+            };
             
             return (
                 <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-32">
@@ -332,7 +400,7 @@
                         </div>
                     </nav>
                     
-                    {!sharedData && isSettingsOpen && ( // FIX: Conditional Rendering logic applied
+                    {!sharedData && isSettingsOpen && (
                         <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} currentSettings={settings} onSave={handleSaveSettings} />
                     )}
 
@@ -348,15 +416,27 @@
                                     <p className="text-slate-500 dark:text-slate-400 text-sm">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
                                 </div>
                                 <div className="flex gap-3">
+                                    {/* Copy Summary Button */}
+                                    {analysis && (
+                                        <button 
+                                            onClick={handleCopySummary}
+                                            className="p-3 text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors relative"
+                                            title="Copy Executive Summary"
+                                        >
+                                            {copySuccess ? <Icons.Check /> : <Icons.Copy />}
+                                            {copySuccess && <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs py-1 px-2 rounded opacity-100 transition-opacity whitespace-nowrap">Copied Text!</span>}
+                                        </button>
+                                    )}
+
                                     {/* Share Button */}
                                     {analysis && (
                                         <button 
                                             onClick={handleShare}
                                             className="p-3 text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors relative"
-                                            title="Share Briefing"
+                                            title="Share Briefing Link"
                                         >
                                             {shareUrl ? <Icons.Check /> : <Icons.Share />}
-                                            {shareUrl && <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs py-1 px-2 rounded opacity-100 transition-opacity">Copied!</span>}
+                                            {shareUrl && <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs py-1 px-2 rounded opacity-100 transition-opacity">Copied Link!</span>}
                                         </button>
                                     )}
 
@@ -434,14 +514,30 @@
                         <div className="fixed bottom-0 left-0 right-0 glass border-t border-slate-200 dark:border-slate-800 p-4 shadow-2xl z-50 animate-[slideUp_0.3s_ease-out]">
                             <div className="max-w-5xl mx-auto flex items-center gap-4">
                                 <div className="w-12 h-12 bg-brand-600 rounded-lg flex items-center justify-center shrink-0">
+                                    {/* Make icon pause animation if paused? For now, standard pulse */}
                                     <div className="w-4 h-4 bg-white rounded-full animate-pulse"></div>
                                 </div>
                                 <div className="flex-1">
                                     <p className="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wider mb-1">Now Playing</p>
                                     <p className="text-sm font-medium text-slate-900 dark:text-white">Your Daily AI Briefing</p>
                                 </div>
+                                
+                                {/* Speed Toggle */}
+                                <button 
+                                    onClick={handleToggleSpeed}
+                                    className="px-3 py-1 text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                                >
+                                    {playbackRate.toFixed(2)}x
+                                </button>
+
                                 <div className="flex-1 max-w-md">
-                                    <audio controls autoPlay src={audioSrc} className="w-full h-10 accent-brand-600" />
+                                    <audio 
+                                        ref={audioRef}
+                                        controls 
+                                        autoPlay 
+                                        src={audioSrc} 
+                                        className="w-full h-10 accent-brand-600" 
+                                    />
                                 </div>
                             </div>
                         </div>
