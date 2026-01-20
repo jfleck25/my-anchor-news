@@ -22,13 +22,6 @@
                             600: '#0284c7',
                             700: '#0369a1',
                             900: '#0c4a6e',
-                        },
-                        danger: {
-                            50: '#fef2f2',
-                            100: '#fee2e2',
-                            500: '#ef4444',
-                            600: '#dc2626',
-                            700: '#b91c1c',
                         }
                     }
                 }
@@ -45,14 +38,6 @@
         }
         .dark .glass {
             background: rgba(15, 23, 42, 0.7);
-        }
-        /* Toggle Switch CSS */
-        .toggle-checkbox:checked {
-            right: 0;
-            border-color: #ef4444;
-        }
-        .toggle-checkbox:checked + .toggle-label {
-            background-color: #ef4444;
         }
         /* Hide scrollbar for clean UI */
         ::-webkit-scrollbar { width: 8px; }
@@ -82,18 +67,13 @@
             Refresh: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>,
             Share: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>,
             Check: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
-            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
-            Alert: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
         };
 
         // --- Component: Settings Modal ---
         const SettingsModal = ({ isOpen, onClose, currentSettings, onSave }) => {
-            // Note: We depend on the parent unmounting/remounting this component to reset state
-            // when it opens. This is handled by the conditional rendering in Dashboard.
-
             const [sources, setSources] = React.useState(currentSettings.sources || []);
             const [timeWindow, setTimeWindow] = React.useState(currentSettings.time_window_hours || 24);
-            const [redFlagMode, setRedFlagMode] = React.useState(currentSettings.red_flag_mode || false);
             const [newSource, setNewSource] = React.useState("");
 
             const handleAddSource = () => {
@@ -117,8 +97,7 @@
             const handleSave = () => {
                 onSave({ 
                     sources, 
-                    time_window_hours: parseInt(timeWindow),
-                    red_flag_mode: redFlagMode
+                    time_window_hours: parseInt(timeWindow)
                 });
                 onClose();
             };
@@ -134,30 +113,6 @@
                         </div>
 
                         <div className="p-6 space-y-6">
-                            {/* Red Flag Mode Toggle */}
-                            <div className="flex items-center justify-between p-4 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-100 dark:border-red-900">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <Icons.Alert />
-                                        <label className="text-sm font-bold text-red-800 dark:text-red-200">Red Flag Mode</label>
-                                    </div>
-                                    <p className="text-xs text-red-600 dark:text-red-300 mt-1">
-                                        Only report risks, threats, and negative sentiment. Ignore "good news".
-                                    </p>
-                                </div>
-                                <div className="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
-                                    <input 
-                                        type="checkbox" 
-                                        name="toggle" 
-                                        id="toggle" 
-                                        checked={redFlagMode}
-                                        onChange={(e) => setRedFlagMode(e.target.checked)}
-                                        className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer border-slate-300 checked:border-red-500 checked:right-0 right-6 transition-all duration-200"
-                                    />
-                                    <label htmlFor="toggle" className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer transition-colors duration-200 ${redFlagMode ? 'bg-red-500' : 'bg-slate-300'}`}></label>
-                                </div>
-                            </div>
-
                             {/* Time Window */}
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Lookback Period</label>
@@ -389,12 +344,6 @@
                                 <div>
                                     <div className="flex items-center gap-3 mb-1">
                                         <h2 className="text-2xl font-serif font-bold text-slate-900 dark:text-white">Morning Briefing</h2>
-                                        {/* Added Red Flag Badge */}
-                                        {settings.red_flag_mode && (
-                                            <span className="px-3 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs font-bold uppercase tracking-wider rounded-full border border-red-200 dark:border-red-800 animate-pulse">
-                                                Red Flag Active
-                                            </span>
-                                        )}
                                     </div>
                                     <p className="text-slate-500 dark:text-slate-400 text-sm">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
                                 </div>

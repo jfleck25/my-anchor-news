@@ -45,42 +45,6 @@ CACHE_TTL_SECONDS = 900
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# --- PROMPTS ---
-STANDARD_PROMPT = """
-You are an elite media analyst. Provide raw text from multiple newsletters.
-
-Task:
-1. Group distinct news events.
-2. Create neutral headlines.
-3. Write 3-4 sentence summary of facts.
-4. **DEEP ANGLE ANALYSIS**: 1-2 sentences per article. Include specific facts/data/quotes. Start with verb (e.g. "Cites...").
-5. **Remaining Stories**: Top 5 only. One-sentence summary.
-6. **Filter**: Ignore ads/fluff.
-7. **Limit**: Top 10 groups max.
-
-Output JSON: { "story_groups": [ { "group_headline": "...", "group_summary": "...", "stories": [ { "headline": "...", "source": "...", "angle": "..." } ] } ], "remaining_stories": [ { "headline": "..." } ] }
-
-Content: ---
-"""
-
-RISK_PROMPT = """
-You are a paranoid Chief Risk Officer and Short Seller. I will provide raw text from multiple newsletters. 
-Your goal is DOWNSIDE PROTECTION. Ignore "good news". Focus ONLY on risks, threats, and negative sentiment.
-
-Task:
-1. **Identify THREATS:** Only group stories involving regulatory crackdowns, lawsuits, market volatility, earnings misses, geopolitical instability, or executive scandals.
-2. **IGNORE FLUFF:** Do NOT report on product launches, philanthropy, "optimistic" puff pieces, or general growth updates unless they conceal a risk.
-3. **Headline:** Write urgent, risk-focused headlines (e.g. "Regulatory scrutiny intensifies for..." instead of "Update on...").
-4. **Summary:** 3-4 sentences focusing on the *impact* of the risk. Who loses money? What is the legal exposure?
-5. **DEEP ANGLE ANALYSIS**: Analyze the skepticism. Example: "Highlights the gap between the CEO's optimism and the weak balance sheet."
-6. **Remaining Stories**: Top 5 *risk* headlines only.
-7. **Limit**: Top 10 groups max. If no risks are found, return an empty list or minor concerns.
-
-Output JSON: { "story_groups": [ { "group_headline": "...", "group_summary": "...", "stories": [ { "headline": "...", "source": "...", "angle": "..." } ] } ], "remaining_stories": [ { "headline": "..." } ] }
-
-Content: ---
-"""
-
 # --- Database Setup (Postgres) ---
 def init_db():
     if not DATABASE_URL: 
@@ -124,8 +88,7 @@ def get_user_info():
 def load_settings(user_email=None):
     defaults = {
         "sources": ["wsj.com", "nytimes.com", "axios.com", "theguardian.com", "techcrunch.com"],
-        "time_window_hours": 24,
-        "red_flag_mode": False
+        "time_window_hours": 24
     }
     
     if DATABASE_URL and user_email:
@@ -237,13 +200,47 @@ def generate_script_from_analysis(analysis_json):
     script += "That concludes your briefing."
     return script
 
-def analyze_news_with_llm(newsletters_text, use_risk_mode=False):
+def analyze_news_with_llm(newsletters_text):
     if not model: 
         raise Exception("Gemini API model is not configured.")
     
-    # Select the appropriate prompt
-    base_prompt = RISK_PROMPT if use_risk_mode else STANDARD_PROMPT
-    prompt = base_prompt + newsletters_text
+    prompt = """
+    You are an elite media analyst. Provide raw text from multiple newsletters.
+    
+    Your Goal: Don't just summarize the news. Analyze *how* it is being reported.
+    
+    Task Instructions:
+    1.  **Identify & Group:** Find the distinct news events mentioned across the text.
+    2.  **Headline:** Create a single, neutral headline for each group.
+    3.  **Summary:** Write a 3-4 sentence summary of the actual event (the facts).
+    4.  **DEEP ANGLE ANALYSIS (Crucial):** For each article in a group, write a 1-2 sentence analysis of its specific reporting angle. 
+        * **Requirement:** You MUST include specific facts. Do not just say "Focuses on inflation."
+        * **Requirement:** Cite the specific data point, person, or quote the article uses to support its point.
+        * *Example:* "Cites the 0.5% drop in bond yields to argue that market confidence is returning."
+        * *Example:* "Quotes Senator Smith's critique to frame the bill as a failure."
+        * *Format:* Start the sentence with a verb (e.g., "Highlights...", "Argues...", "Uses...").
+    5.  **Remaining Stories:** Identify the **top 5** significant headlines that didn't fit main groups.
+        * **Requirement:** Provide a **one-sentence summary** of the event, NOT just the headline.
+    6.  **Filtering:** Ignore ads, subscription links, and "housekeeping" text.
+    7.  **Limit:** Return only the top 10 story groups to prevent data overflow.
+    
+    Output Format: Return ONLY valid JSON.
+    { 
+      "story_groups": [ 
+        { 
+          "group_headline": "...", 
+          "group_summary": "...", 
+          "stories": [ 
+            { "headline": "...", "source": "...", "angle": "..." } 
+          ] 
+        } 
+      ], 
+      "remaining_stories": [ { "headline": "..." } ] 
+    }
+
+    Newsletter Content:
+    ---
+    """ + newsletters_text
 
     try:
         generation_config = genai.types.GenerationConfig(max_output_tokens=8192, temperature=0.2)
@@ -344,9 +341,6 @@ def fetch_emails():
     email = user_info.get('email') if user_info else None
     settings = load_settings(email)
     
-    # --- RED FLAG CHECK ---
-    use_risk_mode = settings.get('red_flag_mode', False)
-    
     current_hash = get_settings_hash(settings)
     cache = load_cache()
     if (cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (cache.get('settings_hash') == current_hash) and (cache.get('analysis')):
@@ -385,8 +379,7 @@ def fetch_emails():
 
         if not consolidated_text: return jsonify({'story_groups': [], 'remaining_stories': [{'headline': 'No text found.'}]})
         
-        # --- PASS MODE TO ANALYZER ---
-        analysis_result = analyze_news_with_llm(consolidated_text, use_risk_mode)
+        analysis_result = analyze_news_with_llm(consolidated_text)
         
         cache['timestamp'] = time.time()
         cache['settings_hash'] = current_hash
