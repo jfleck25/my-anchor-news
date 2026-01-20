@@ -1,4 +1,4 @@
-# main.py
+# ... existing imports ...
 import os
 import base64
 import json
@@ -23,6 +23,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 # --- Configuration & Constants ---
+# ... existing config ...
 app = flask.Flask(__name__, static_folder='.', static_url_path='')
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 CORS(app, supports_credentials=True)
@@ -45,10 +46,10 @@ CACHE_TTL_SECONDS = 900
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# --- PERSONA CONFIGURATION (Updated for Contrast) ---
+# --- PERSONA CONFIGURATION (Fixed for Stability) ---
 PERSONAS = {
     "anchor": {
-        "voice_name": "en-US-Journey-D", # User Favorite: Deep, warm (Male)
+        "voice_name": "en-US-Journey-D", # User Favorite (Male)
         "gender": texttospeech.SsmlVoiceGender.MALE,
         "speaking_rate": 1.0,
         "pitch": 0.0,
@@ -57,19 +58,19 @@ PERSONAS = {
         "outro": "That concludes your briefing. Have a good day."
     },
     "analyst": {
-        "voice_name": "en-US-Neural2-J", # CHANGED: Serious, newscaster style (Male) to contrast with DJ
+        "voice_name": "en-US-Neural2-J", # Serious, News-style (Male)
         "gender": texttospeech.SsmlVoiceGender.MALE,
-        "speaking_rate": 1.15, # Faster, data-driven pace
-        "pitch": -2.0, # Slightly deeper authority
+        "speaking_rate": 1.20, # Fast/Efficient
+        "pitch": -2.0, # Deeper/Authoritative
         "intro": ["Market update.", "Here is the data.", "Let's look at the numbers."],
         "transition": ["Next sector:", "Analysis:", "Data point:", "Moving to:"],
         "outro": "Briefing complete."
     },
     "dj": {
-        "voice_name": "en-US-Journey-F", # Expressive, dynamic (Female)
+        "voice_name": "en-US-Neural2-F", # Expressive (Female) - Neural2 is safer for pitch shifts than Journey
         "gender": texttospeech.SsmlVoiceGender.FEMALE,
-        "speaking_rate": 1.1, # Energetic pace
-        "pitch": 2.0, # Slightly higher energy
+        "speaking_rate": 1.15, # Energetic
+        "pitch": 1.5, # Slightly higher/brighter
         "intro": ["Rise and shine! Here's what's happening.", "Yo! Let's get you caught up."],
         "transition": ["Check this out...", "Switching gears...", "And get this...", "Next story..."],
         "outro": "That's the wrap! Catch you later."
@@ -472,7 +473,7 @@ def generate_audio():
             current_chunk = sentence + " "
     if current_chunk: chunks.append(current_chunk)
     
-    # --- Configure Voice based on Persona (Updated with Speed/Pitch) ---
+    # --- Configure Voice based on Persona ---
     persona_config = PERSONAS.get(style, PERSONAS['anchor'])
     
     voice = texttospeech.VoiceSelectionParams(
@@ -481,7 +482,7 @@ def generate_audio():
         ssml_gender=persona_config['gender']
     )
     
-    # --- UPDATE: Set speaking rate and pitch from persona config ---
+    # --- Set speaking rate and pitch from persona config ---
     audio_config = texttospeech.AudioConfig(
         audio_encoding=texttospeech.AudioEncoding.MP3,
         speaking_rate=persona_config.get('speaking_rate', 1.0),
