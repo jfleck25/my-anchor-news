@@ -1,4 +1,4 @@
-# ... existing imports ...
+# main.py
 import os
 import base64
 import json
@@ -23,7 +23,6 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 # --- Configuration & Constants ---
-# ... existing config ...
 app = flask.Flask(__name__, static_folder='.', static_url_path='')
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 CORS(app, supports_credentials=True)
@@ -46,10 +45,10 @@ CACHE_TTL_SECONDS = 900
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# --- PERSONA CONFIGURATION (Fixed for Stability) ---
+# --- PERSONA CONFIGURATION ---
 PERSONAS = {
     "anchor": {
-        "voice_name": "en-US-Journey-D", # User Favorite (Male)
+        "voice_name": "en-US-Journey-D",
         "gender": texttospeech.SsmlVoiceGender.MALE,
         "speaking_rate": 1.0,
         "pitch": 0.0,
@@ -58,26 +57,26 @@ PERSONAS = {
         "outro": "That concludes your briefing. Have a good day."
     },
     "analyst": {
-        "voice_name": "en-US-Neural2-J", # Serious, News-style (Male)
+        "voice_name": "en-US-Neural2-J",
         "gender": texttospeech.SsmlVoiceGender.MALE,
-        "speaking_rate": 1.20, # Fast/Efficient
-        "pitch": -2.0, # Deeper/Authoritative
+        "speaking_rate": 1.20,
+        "pitch": -2.0,
         "intro": ["Market update.", "Here is the data.", "Let's look at the numbers."],
         "transition": ["Next sector:", "Analysis:", "Data point:", "Moving to:"],
         "outro": "Briefing complete."
     },
     "dj": {
-        "voice_name": "en-US-Neural2-F", # Expressive (Female) - Neural2 is safer for pitch shifts than Journey
+        "voice_name": "en-US-Neural2-F",
         "gender": texttospeech.SsmlVoiceGender.FEMALE,
-        "speaking_rate": 1.15, # Energetic
-        "pitch": 1.5, # Slightly higher/brighter
+        "speaking_rate": 1.15,
+        "pitch": 1.5,
         "intro": ["Rise and shine! Here's what's happening.", "Yo! Let's get you caught up."],
         "transition": ["Check this out...", "Switching gears...", "And get this...", "Next story..."],
         "outro": "That's the wrap! Catch you later."
     }
 }
 
-# --- Database Setup (Postgres) ---
+# --- Database Setup ---
 def init_db():
     if not DATABASE_URL: 
         print(" * Running in Local Mode (No Database URL found)")
@@ -101,7 +100,7 @@ def init_db():
         conn.commit()
         cur.close()
         conn.close()
-        print(" * Database connection successful. Tables initialized.")
+        print(" * Database connection successful.")
     except Exception as e:
         print(f" * DB Init Error: {e}")
 
@@ -121,7 +120,9 @@ def load_settings(user_email=None):
     defaults = {
         "sources": ["wsj.com", "nytimes.com", "axios.com", "theguardian.com", "techcrunch.com"],
         "time_window_hours": 24,
-        "personality": "anchor" # Default persona
+        "personality": "anchor",
+        "priority_sources": [],
+        "keywords": []
     }
     
     if DATABASE_URL and user_email:
@@ -136,19 +137,12 @@ def load_settings(user_email=None):
                 user_settings = defaults.copy()
                 user_settings.update(row['settings'])
                 return user_settings
-            else: 
-                return defaults
-        except: 
-            return defaults
+        except: pass
 
-    if not os.path.exists(SETTINGS_FILE): 
-        return defaults
-    
+    if not os.path.exists(SETTINGS_FILE): return defaults
     try: 
-        with open(SETTINGS_FILE, 'r') as f: 
-            return json.load(f)
-    except: 
-        return defaults
+        with open(SETTINGS_FILE, 'r') as f: return json.load(f)
+    except: return defaults
 
 def save_settings(new_settings, user_email=None):
     if DATABASE_URL and user_email:
@@ -163,156 +157,100 @@ def save_settings(new_settings, user_email=None):
             cur.close()
             conn.close()
             return True
-        except: 
-            return False
+        except: return False
             
     try:
-        with open(SETTINGS_FILE, 'w') as f: 
-            json.dump(new_settings, f, indent=2)
+        with open(SETTINGS_FILE, 'w') as f: json.dump(new_settings, f, indent=2)
         return True
-    except: 
-        return False
+    except: return False
 
 def get_client_secrets_config():
     env_secrets = os.environ.get("GOOGLE_CLIENT_SECRETS_JSON")
     if env_secrets:
-        try: 
-            return json.loads(env_secrets)
-        except json.JSONDecodeError: 
-            pass
-    if os.path.exists(CLIENT_SECRETS_FILE): 
-        return CLIENT_SECRETS_FILE
+        try: return json.loads(env_secrets)
+        except json.JSONDecodeError: pass
+    if os.path.exists(CLIENT_SECRETS_FILE): return CLIENT_SECRETS_FILE
     raise FileNotFoundError("Client secrets not found.")
 
 PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
 if not PROJECT_ID:
     try:
         config = get_client_secrets_config()
-        if isinstance(config, dict): 
-            secrets = config
+        if isinstance(config, dict): secrets = config
         else:
-            with open(config, 'r') as f: 
-                secrets = json.load(f)
+            with open(config, 'r') as f: secrets = json.load(f)
         data = secrets.get('web') or secrets.get('installed')
-        if data: 
-            PROJECT_ID = data.get('project_id')
-    except: 
-        pass
+        if data: PROJECT_ID = data.get('project_id')
+    except: pass
 
 api_key = os.environ.get("GOOGLE_API_KEY")
 if api_key:
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
-    except: 
-        model = None
+    except: model = None
 
 def sanitize_for_llm(text):
     text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
     return text.replace('\\', '\\\\').replace('"', '\\"')
 
 def generate_script_from_analysis(analysis_json, style="anchor"):
-    """
-    Converts JSON to script, adapting intro/transitions based on 'style'.
-    """
     persona = PERSONAS.get(style, PERSONAS["anchor"])
-    
-    # Randomize intro to keep it fresh
     script = f"{random.choice(persona['intro'])} "
     
     story_groups = analysis_json.get('story_groups', [])
     for i, group in enumerate(story_groups):
         script += f"{group.get('group_headline', '')}. {group.get('group_summary', '')}. "
-        
         stories = group.get('stories', [])
         if len(stories) > 1:
             script += "Perspectives: "
             for story in stories:
                 source = story.get('source', 'One source').split('<')[0].strip().replace('.com', '')
                 script += f"The {source} {story.get('angle', '')}. "
-        
-        if i < len(story_groups) - 1: 
-            script += f" {random.choice(persona['transition'])} "
+        if i < len(story_groups) - 1: script += f" {random.choice(persona['transition'])} "
             
     remaining = analysis_json.get('remaining_stories', [])
     if remaining:
         script += "Briefly: "
-        for story in remaining: 
-            script += f"{story.get('headline', '')}. "
-            
+        for story in remaining: script += f"{story.get('headline', '')}. "
     script += f" {persona['outro']}"
     return script
 
 def analyze_news_with_llm(newsletters_text):
-    if not model: 
-        raise Exception("Gemini API model is not configured.")
-    
+    if not model: raise Exception("Gemini API model is not configured.")
     prompt = """
     You are an elite media analyst. Provide raw text from multiple newsletters.
+    Task:
+    1. Group distinct news events.
+    2. Create neutral headlines.
+    3. Write 3-4 sentence summary of facts.
+    4. **DEEP ANGLE ANALYSIS**: 1-2 sentences per article. Include specific facts/data/quotes. Start with verb (e.g. "Cites...").
+    5. **Remaining Stories**: Top 5 only. One-sentence summary.
+    6. **Filter**: Ignore ads/fluff.
+    7. **Limit**: Top 10 groups max.
     
-    Your Goal: Don't just summarize the news. Analyze *how* it is being reported.
+    Output JSON: { "story_groups": [ { "group_headline": "...", "group_summary": "...", "stories": [ { "headline": "...", "source": "...", "angle": "..." } ] } ], "remaining_stories": [ { "headline": "..." } ] }
     
-    Task Instructions:
-    1.  **Identify & Group:** Find the distinct news events mentioned across the text.
-    2.  **Headline:** Create a single, neutral headline for each group.
-    3.  **Summary:** Write a 3-4 sentence summary of the actual event (the facts).
-    4.  **DEEP ANGLE ANALYSIS (Crucial):** For each article in a group, write a 1-2 sentence analysis of its specific reporting angle. 
-        * **Requirement:** You MUST include specific facts. Do not just say "Focuses on inflation."
-        * **Requirement:** Cite the specific data point, person, or quote the article uses to support its point.
-        * *Example:* "Cites the 0.5% drop in bond yields to argue that market confidence is returning."
-        * *Example:* "Quotes Senator Smith's critique to frame the bill as a failure."
-        * *Format:* Start the sentence with a verb (e.g., "Highlights...", "Argues...", "Uses...").
-    5.  **Remaining Stories:** Identify the **top 5** significant headlines that didn't fit main groups.
-        * **Requirement:** Provide a **one-sentence summary** of the event, NOT just the headline.
-    6.  **Filtering:** Ignore ads, subscription links, and "housekeeping" text.
-    7.  **Limit:** Return only the top 10 story groups to prevent data overflow.
-    
-    Output Format: Return ONLY valid JSON.
-    { 
-      "story_groups": [ 
-        { 
-          "group_headline": "...", 
-          "group_summary": "...", 
-          "stories": [ 
-            { "headline": "...", "source": "...", "angle": "..." } 
-          ] 
-        } 
-      ], 
-      "remaining_stories": [ { "headline": "..." } ] 
-    }
-
-    Newsletter Content:
-    ---
+    Content: ---
     """ + newsletters_text
-
     try:
         generation_config = genai.types.GenerationConfig(max_output_tokens=8192, temperature=0.2)
         response = model.generate_content(prompt, generation_config=generation_config)
         match = re.search(r'\{.*\}', response.text, re.DOTALL)
-        if match: 
-            return json.loads(match.group(0))
-        else: 
-            raise ValueError("No valid JSON found.")
-    except json.JSONDecodeError: 
-        return {"error": "Analysis failed due to volume."}
-    except Exception as e: 
-        return {"error": "AI analysis failed."}
+        if match: return json.loads(match.group(0))
+        else: raise ValueError("No valid JSON found.")
+    except json.JSONDecodeError: return {"error": "Analysis failed due to volume."}
+    except Exception as e: return {"error": "AI analysis failed."}
 
+# --- Caching Helpers ---
 def load_cache():
-    if not os.path.exists(CACHE_FILE): 
-        return {}
-    try: 
-        with open(CACHE_FILE, 'r') as f: 
-            return json.load(f)
-    except: 
-        return {}
+    if not os.path.exists(CACHE_FILE): return {}
+    try: with open(CACHE_FILE, 'r') as f: return json.load(f)
+    except: return {}
 
 def save_cache(data):
-    try: 
-        with open(CACHE_FILE, 'w') as f: 
-            json.dump(data, f)
-    except: 
-        pass
+    try: with open(CACHE_FILE, 'w') as f: json.dump(data, f)
+    except: pass
 
 def get_settings_hash(settings):
     s = json.dumps(settings, sort_keys=True)
@@ -321,8 +259,7 @@ def get_settings_hash(settings):
 # --- Routes ---
 
 @app.route('/')
-def index():
-    return send_from_directory('.', 'index.html')
+def index(): return send_from_directory('.', 'index.html')
 
 @app.route('/login')
 def login():
@@ -394,33 +331,65 @@ def fetch_emails():
         service = build('gmail', 'v1', credentials=creds)
         sources = settings.get('sources', []) or ["wsj.com", "nytimes.com"]
         hours = settings.get('time_window_hours', 24)
+        
+        # --- NEW: Get Watchlist & Priority ---
+        keywords = settings.get('keywords', [])
+        priority_sources = settings.get('priority_sources', [])
+        
         sources_query = " OR ".join([f"from:{s}" for s in sources])
         query = f"({sources_query}) newer_than:{hours}h"
         
-        results = service.users().messages().list(userId='me', q=query, maxResults=25).execute()
+        # Increase maxResults to account for filtering
+        results = service.users().messages().list(userId='me', q=query, maxResults=50).execute()
         messages = results.get('messages', [])
         if not messages: return jsonify({'story_groups': [], 'remaining_stories': [{'headline': f'No newsletters found in last {hours}h.'}]})
         
-        consolidated_text = ""
+        priority_text = ""
+        normal_text = ""
+        
         for message in messages:
             msg = service.users().messages().get(userId='me', id=message['id'], format='full').execute()
             headers = msg['payload']['headers']
             subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
             sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'No Sender')
+            
             body_data = ""
             if 'parts' in msg['payload']:
                 for part in msg['payload']['parts']:
                     if part['mimeType'] == 'text/html': body_data = part['body']['data']; break
             else: body_data = msg['payload'].get('body', {}).get('data', '')
             if not body_data: continue
+            
             decoded_data = base64.urlsafe_b64decode(body_data.encode('ASCII'))
             soup = BeautifulSoup(decoded_data, "lxml")
             clean_text = soup.get_text(separator='\n', strip=True)
             sanitized_text = sanitize_for_llm(clean_text)
-            if len(sanitized_text) > 4000: sanitized_text = sanitized_text[:4000] + "... [TRUNCATED]"
-            consolidated_text += f"\n\n--- Newsletter from: {sender} ---\n--- Subject: {subject} ---\n{sanitized_text}\n"
+            
+            # --- FEATURE: Watchlist Filtering ---
+            # If keywords are set, skip emails that don't match ANY keyword
+            if keywords:
+                has_keyword = any(k.lower() in sanitized_text.lower() or k.lower() in subject.lower() for k in keywords)
+                if not has_keyword:
+                    continue
 
-        if not consolidated_text: return jsonify({'story_groups': [], 'remaining_stories': [{'headline': 'No text found.'}]})
+            if len(sanitized_text) > 4000: sanitized_text = sanitized_text[:4000] + "... [TRUNCATED]"
+            
+            email_block = f"\n\n--- Newsletter from: {sender} ---\n--- Subject: {subject} ---\n{sanitized_text}\n"
+            
+            # --- FEATURE: Source Prioritization ---
+            # If sender is in priority list, add to priority block
+            is_priority = any(p.lower() in sender.lower() for p in priority_sources)
+            if is_priority:
+                priority_text += f"*** PRIORITY SOURCE ***\n{email_block}"
+            else:
+                normal_text += email_block
+
+        # Put priority text FIRST so LLM sees it
+        consolidated_text = priority_text + normal_text
+
+        if not consolidated_text: 
+            reason = "No text found matching your watchlist." if keywords else "No text found."
+            return jsonify({'story_groups': [], 'remaining_stories': [{'headline': reason}]})
         
         analysis_result = analyze_news_with_llm(consolidated_text)
         
@@ -454,13 +423,8 @@ def generate_audio():
     tts_client = texttospeech.TextToSpeechClient(credentials=creds, client_options=client_opts, transport="rest")
     
     analysis_data = request.get_json()
-    
-    # --- Pass Style to Script Generator ---
     script_text = generate_script_from_analysis(analysis_data, style)
-    
-    # Hash includes style so we cache different voices separately
     script_hash = hashlib.md5((script_text + style).encode()).hexdigest()
-    
     cache = load_cache()
     if cache.get('script_hash') == script_hash and cache.get('audio'): return jsonify({"audio_content": cache['audio']})
     
@@ -473,22 +437,9 @@ def generate_audio():
             current_chunk = sentence + " "
     if current_chunk: chunks.append(current_chunk)
     
-    # --- Configure Voice based on Persona ---
     persona_config = PERSONAS.get(style, PERSONAS['anchor'])
-    
-    voice = texttospeech.VoiceSelectionParams(
-        language_code="en-US", 
-        name=persona_config['voice_name'],
-        ssml_gender=persona_config['gender']
-    )
-    
-    # --- Set speaking rate and pitch from persona config ---
-    audio_config = texttospeech.AudioConfig(
-        audio_encoding=texttospeech.AudioEncoding.MP3,
-        speaking_rate=persona_config.get('speaking_rate', 1.0),
-        pitch=persona_config.get('pitch', 0.0)
-    )
-    
+    voice = texttospeech.VoiceSelectionParams(language_code="en-US", name=persona_config['voice_name'], ssml_gender=persona_config['gender'])
+    audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3, speaking_rate=persona_config.get('speaking_rate', 1.0), pitch=persona_config.get('pitch', 0.0))
     all_audio_content = b""
     for chunk_text in chunks:
         if len(chunk_text.encode('utf-8')) > byte_limit: chunk_text = chunk_text.encode('utf-8')[:byte_limit].decode('utf-8', 'ignore')
