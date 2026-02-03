@@ -1,6 +1,6 @@
 # Use the standard Python 3.10 image
 # (Not 'slim', so it includes C++ compilers if needed, and '3.10' has pre-built wheels)
-FROM python:3.10
+FROM python:3.15-rc-slim-trixie
 
 # Set the working directory
 WORKDIR /app
