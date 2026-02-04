@@ -21,14 +21,38 @@ import google.auth.transport.requests
 from werkzeug.middleware.proxy_fix import ProxyFix
 import psycopg2 
 from psycopg2.extras import RealDictCursor
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 # --- Configuration & Constants ---
 app = flask.Flask(__name__, static_folder='.', static_url_path='')
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 CORS(app, supports_credentials=True)
 
+# --- Rate Limiting ---
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "default_secret_key_for_development")
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+
+# Enable detailed error messages in development
+if os.environ.get("FLASK_ENV") != "production":
+    app.config['DEBUG'] = True
+    app.config['PROPAGATE_EXCEPTIONS'] = True
+
+# Global error handler to catch all unhandled exceptions
+@app.errorhandler(500)
+def handle_500_error(e):
+    import traceback
+    error_trace = traceback.format_exc()
+    print(f"Unhandled 500 error: {e}")
+    print(error_trace)
+    return jsonify({'error': f'Internal server error: {str(e)}', 'details': error_trace[:500] if app.config.get('DEBUG') else None}), 500
 
 SCOPES = [
     'https://www.googleapis.com/auth/userinfo.email',
@@ -245,12 +269,17 @@ def analyze_news_with_llm(newsletters_text):
 # --- Caching Helpers ---
 def load_cache():
     if not os.path.exists(CACHE_FILE): return {}
-    try: with open(CACHE_FILE, 'r') as f: return json.load(f)
-    except: return {}
+    try:
+        with open(CACHE_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return {}
 
 def save_cache(data):
-    try: with open(CACHE_FILE, 'w') as f: json.dump(data, f)
-    except: pass
+    try: 
+        with open(CACHE_FILE, 'w') as f: json.dump(data, f)
+    except Exception as e:
+        pass
 
 def get_settings_hash(settings):
     s = json.dumps(settings, sort_keys=True)
@@ -263,29 +292,57 @@ def index(): return send_from_directory('.', 'index.html')
 
 @app.route('/login')
 def login():
-    config = get_client_secrets_config()
-    if isinstance(config, dict):
-        flow = Flow.from_client_config(config, scopes=SCOPES)
-        flow.redirect_uri = url_for('oauth2callback', _external=True)
-    else:
-        flow = Flow.from_client_secrets_file(config, scopes=SCOPES, redirect_uri=url_for('oauth2callback', _external=True))
-    authorization_url, state = flow.authorization_url(access_type='offline', include_granted_scopes='true', prompt='consent')
-    session['state'] = state
-    return redirect(authorization_url)
+    try:
+        config = get_client_secrets_config()
+        if isinstance(config, dict):
+            flow = Flow.from_client_config(config, scopes=SCOPES)
+            flow.redirect_uri = url_for('oauth2callback', _external=True)
+        else:
+            flow = Flow.from_client_secrets_file(config, scopes=SCOPES, redirect_uri=url_for('oauth2callback', _external=True))
+        authorization_url, state = flow.authorization_url(access_type='offline', include_granted_scopes='true', prompt='consent')
+        session['state'] = state
+        return redirect(authorization_url)
+    except FileNotFoundError as e:
+        print(f"ERROR in login route: Client secrets not found: {e}")
+        return jsonify({'error': 'OAuth configuration not found. Please set GOOGLE_CLIENT_SECRETS_JSON environment variable or create client_secrets.json file.'}), 500
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"ERROR in login route: {e}")
+        print(error_trace)
+        return jsonify({'error': f'Login failed: {str(e)}'}), 500
 
 @app.route('/oauth2callback')
 def oauth2callback():
-    state = session['state']
-    config = get_client_secrets_config()
-    if isinstance(config, dict):
-        flow = Flow.from_client_config(config, scopes=SCOPES)
-        flow.redirect_uri = url_for('oauth2callback', _external=True)
-    else:
-        flow = Flow.from_client_secrets_file(config, scopes=SCOPES, state=state, redirect_uri=url_for('oauth2callback', _external=True))
-    flow.fetch_token(authorization_response=request.url)
-    credentials = flow.credentials
-    session['credentials'] = {'token': credentials.token, 'refresh_token': credentials.refresh_token, 'token_uri': credentials.token_uri, 'client_id': credentials.client_id, 'client_secret': credentials.client_secret, 'scopes': credentials.scopes}
-    return redirect("/")
+    try:
+        if 'state' not in session:
+            print("ERROR: State missing from session")
+            return jsonify({'error': 'Invalid session state'}), 400
+        state = session['state']
+        
+        try:
+            config = get_client_secrets_config()
+        except FileNotFoundError as config_err:
+            print(f"ERROR: Client secrets not found: {config_err}")
+            return jsonify({'error': 'OAuth configuration not found. Please check GOOGLE_CLIENT_SECRETS_JSON environment variable or client_secrets.json file.'}), 500
+        
+        if isinstance(config, dict):
+            flow = Flow.from_client_config(config, scopes=SCOPES)
+            flow.redirect_uri = url_for('oauth2callback', _external=True)
+        else:
+            flow = Flow.from_client_secrets_file(config, scopes=SCOPES, state=state, redirect_uri=url_for('oauth2callback', _external=True))
+        
+        flow.fetch_token(authorization_response=request.url)
+        credentials = flow.credentials
+        
+        session['credentials'] = {'token': credentials.token, 'refresh_token': credentials.refresh_token, 'token_uri': credentials.token_uri, 'client_id': credentials.client_id, 'client_secret': credentials.client_secret, 'scopes': credentials.scopes}
+        return redirect("/")
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"OAuth callback error: {e}")
+        print(error_trace)
+        return jsonify({'error': f'OAuth callback failed: {str(e)}'}), 500
 
 @app.route('/logout')
 def logout():
@@ -313,12 +370,29 @@ def update_settings():
         return jsonify({'status': 'success'})
     return jsonify({'error': 'Failed to save settings'}), 500
 
+def get_user_email_for_rate_limit():
+    """Get user email from session or use IP address as fallback"""
+    if 'user_email' in session:
+        return session['user_email']
+    # Try to get from user info if available
+    try:
+        user_info = get_user_info()
+        if user_info and user_info.get('email'):
+            session['user_email'] = user_info['email']
+            return user_info['email']
+    except Exception as e:
+        pass
+    return get_remote_address()
+
 @app.route('/api/fetch_emails')
+@limiter.limit("3 per day", key_func=get_user_email_for_rate_limit, error_message="Daily limit reached. Upgrade to Pro for unlimited briefings.")
 def fetch_emails():
     if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
     
     user_info = get_user_info()
     email = user_info.get('email') if user_info else None
+    # Store email in session for rate limiting
+    if email: session['user_email'] = email
     settings = load_settings(email)
     
     current_hash = get_settings_hash(settings)
