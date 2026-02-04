@@ -8,6 +8,13 @@ WORKDIR /app
 # Copy the requirements file
 COPY requirements.txt .
 
+# Install system dependencies for lxml and other packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libxml2-dev \
+    libxslt1-dev \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
 # 1. Upgrade pip to the latest version
 # 2. Install dependencies
 RUN pip install --upgrade pip && \
