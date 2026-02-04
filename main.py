@@ -7,7 +7,11 @@ import time
 import hashlib
 import uuid
 import random
+from dotenv import load_dotenv
 import flask
+
+# Load environment variables from .env file
+load_dotenv()
 from flask import request, redirect, session, url_for, jsonify, send_from_directory
 from flask_cors import CORS
 from google_auth_oauthlib.flow import Flow
@@ -23,6 +27,24 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+
+# --- Sentry Configuration ---
+# Get Sentry DSN from environment variable
+SENTRY_DSN = os.environ.get("SENTRY_DSN")
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[FlaskIntegration()],
+        traces_sample_rate=1.0,  # Capture 100% of transactions for performance monitoring
+        profiles_sample_rate=1.0,  # Capture 100% of profiles
+        environment=os.environ.get("FLASK_ENV", "development"),
+        release=os.environ.get("APP_VERSION", "1.0.0")
+    )
+    print(" * Sentry error tracking enabled")
+else:
+    print(" * Sentry DSN not found - error tracking disabled (set SENTRY_DSN environment variable)")
 
 # --- Configuration & Constants ---
 app = flask.Flask(__name__, static_folder='.', static_url_path='')
@@ -356,19 +378,21 @@ def check_auth():
 
 @app.route('/api/settings', methods=['GET'])
 def get_settings():
-    if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
+    if 'credentials' not in session: 
+        return jsonify({'error': 'Please log in to view your settings.'}), 401
     user_info = get_user_info()
     email = user_info.get('email') if user_info else None
     return jsonify(load_settings(email))
 
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
-    if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
+    if 'credentials' not in session: 
+        return jsonify({'error': 'Please log in to save your settings.'}), 401
     user_info = get_user_info()
     email = user_info.get('email') if user_info else None
     if save_settings(request.get_json(), email):
         return jsonify({'status': 'success'})
-    return jsonify({'error': 'Failed to save settings'}), 500
+    return jsonify({'error': 'Unable to save settings. Please try again or contact support if the issue persists.'}), 500
 
 def get_user_email_for_rate_limit():
     """Get user email from session or use IP address as fallback"""
@@ -385,9 +409,10 @@ def get_user_email_for_rate_limit():
     return get_remote_address()
 
 @app.route('/api/fetch_emails')
-@limiter.limit("3 per day", key_func=get_user_email_for_rate_limit, error_message="Daily limit reached. Upgrade to Pro for unlimited briefings.")
+@limiter.limit("3 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit of 3 briefings. Upgrade to Pro for unlimited briefings or try again tomorrow!")
 def fetch_emails():
-    if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
+    if 'credentials' not in session: 
+        return jsonify({'error': 'Please log in to generate your briefing.'}), 401
     
     user_info = get_user_info()
     email = user_info.get('email') if user_info else None
@@ -478,7 +503,8 @@ def fetch_emails():
 
 @app.route('/api/generate_audio', methods=['POST'])
 def generate_audio():
-    if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
+    if 'credentials' not in session: 
+        return jsonify({'error': 'Please log in to generate audio.'}), 401
     
     # --- Load Settings to get Persona ---
     user_info = get_user_info()
@@ -549,9 +575,10 @@ def get_shared_briefing(share_id):
             cur.execute("SELECT data FROM shared_briefings WHERE share_id = %s", (share_id,))
             row = cur.fetchone(); cur.close(); conn.close()
             if row: return jsonify(row['data'])
-            return jsonify({'error': 'Not found'}), 404
-        except: return jsonify({'error': 'DB error'}), 500
-    return jsonify({'error': 'DB not configured'}), 500
+            return jsonify({'error': 'This shared briefing could not be found. The link may be invalid or expired.'}), 404
+        except: 
+            return jsonify({'error': 'Unable to load shared briefing. Please try again.'}), 500
+    return jsonify({'error': 'Shared briefings are not available. Database connection required.'}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
