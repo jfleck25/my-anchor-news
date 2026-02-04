@@ -8,10 +8,11 @@ WORKDIR /app
 # Copy the requirements file
 COPY requirements.txt .
 
-# Install system dependencies for lxml and other packages
+# Install system dependencies for lxml, psycopg2, and other packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libxml2-dev \
     libxslt1-dev \
+    libpq-dev \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
