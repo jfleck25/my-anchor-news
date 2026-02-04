@@ -42,6 +42,23 @@
         // TODO: Replace with your PostHog API key from https://app.posthog.com/project/settings
         posthog.init('phc_DdcJ4gpfXZKcv0Pxw1wf705hM7Hbh5UJDjY5gpAsNO9', {api_host: 'https://app.posthog.com'});
     </script>
+    <!-- Sentry Error Tracking -->
+    <script src="https://browser.sentry-cdn.com/7.99.0/bundle.min.js" crossorigin="anonymous"></script>
+    <script>
+        // Initialize Sentry immediately after SDK loads
+        if (typeof Sentry !== 'undefined') {
+            Sentry.init({
+                dsn: 'https://60941cc5aecb13616161db1ee2a5186c@o4510829357236224.ingest.us.sentry.io/4510829367197696',
+                integrations: [new Sentry.BrowserTracing()],
+                tracesSampleRate: 1.0,
+                environment: window.location.hostname === 'localhost' ? 'development' : 'production',
+                release: 'my-anchor@1.0.0'
+            });
+            console.log('✅ Sentry error tracking enabled');
+        } else {
+            console.error('❌ Sentry SDK failed to load');
+        }
+    </script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         h1, h2, h3, h4 { font-family: 'Merriweather', serif; }
@@ -81,6 +98,7 @@
             Share: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>,
             Copy: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
             Check: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+            Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
             Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
             Alert: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>,
             Mic: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>,
@@ -379,7 +397,7 @@
                             });
                         }
                     }
-                } catch (e) { setError("Failed to save settings."); }
+                } catch (e) { setError("Unable to save settings. Please check your connection and try again."); }
             };
 
             const handleFetchAndAnalyze = async () => {
@@ -387,7 +405,14 @@
                 const startTime = Date.now();
                 try {
                     const res = await fetch(`${backendUrl}/api/fetch_emails`, { credentials: 'include' });
-                    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                    if (!res.ok) {
+                        const errorData = await res.json().catch(() => ({}));
+                        const errorMsg = errorData.error || 
+                            (res.status === 429 ? "You've reached your daily briefing limit. Try again tomorrow!" :
+                             res.status === 401 ? "Please log in to generate your briefing." :
+                             "Unable to generate briefing. Please try again.");
+                        throw new Error(errorMsg);
+                    }
                     const data = await res.json();
                     setAnalysis(data);
                     const generationTime = Date.now() - startTime;
@@ -420,7 +445,13 @@
                         body: JSON.stringify(analysis),
                         credentials: 'include'
                     });
-                    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                    if (!res.ok) {
+                        const errorData = await res.json().catch(() => ({}));
+                        const errorMsg = errorData.error || 
+                            (res.status === 401 ? "Please log in to generate audio." :
+                             "Unable to generate audio. Please try again.");
+                        throw new Error(errorMsg);
+                    }
                     const data = await res.json();
                     setAudioSrc(`data:audio/mp3;base64,${data.audio_content}`);
                     const generationTime = Date.now() - startTime;
@@ -477,31 +508,298 @@
                 finally { setIsSharing(false); }
             };
 
+            const generateFormattedSummary = () => {
+                if (!analysis) return '';
+                const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+                const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                
+                let text = `═══════════════════════════════════════════════════════\n`;
+                text += `MY ANCHOR - Daily AI News Briefing\n`;
+                text += `${today} at ${time}\n`;
+                text += `═══════════════════════════════════════════════════════\n\n`;
+                
+                // Top Stories
+                if (analysis.story_groups && analysis.story_groups.length > 0) {
+                    text += `📰 TOP STORIES\n`;
+                    text += `${'─'.repeat(55)}\n\n`;
+                    
+                    analysis.story_groups.forEach((group, index) => {
+                        text += `${index + 1}. ${group.group_headline.toUpperCase()}\n\n`;
+                        text += `   ${group.group_summary}\n\n`;
+                        
+                        if (group.stories && group.stories.length > 0) {
+                            text += `   📊 Source Perspectives:\n`;
+                            group.stories.forEach(story => {
+                                const source = story.source.split('<')[0].trim().replace('.com', '');
+                                text += `   • ${source}: ${story.angle}\n`;
+                            });
+                            text += `\n`;
+                        }
+                        
+                        if (index < analysis.story_groups.length - 1) {
+                            text += `${'─'.repeat(55)}\n\n`;
+                        }
+                    });
+                }
+                
+                // In Brief Section
+                if (analysis.remaining_stories && analysis.remaining_stories.length > 0) {
+                    text += `\n📌 IN BRIEF\n`;
+                    text += `${'─'.repeat(55)}\n\n`;
+                    analysis.remaining_stories.forEach(story => {
+                        text += `• ${story.headline}\n`;
+                    });
+                    text += `\n`;
+                }
+                
+                // Footer
+                text += `${'═'.repeat(55)}\n`;
+                text += `Generated by My Anchor - Your AI News Analyst\n`;
+                text += `https://myanchor.app\n`;
+                text += `${'═'.repeat(55)}`;
+                
+                return text;
+            };
+
             const handleCopySummary = () => {
                 if (!analysis) return;
-                const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-                let text = `Morning Briefing - ${today}\n\n`;
-                if (analysis.story_groups) {
-                    analysis.story_groups.forEach(group => {
-                        text += `**${group.group_headline}**\n${group.group_summary}\n`;
-                        if (group.stories) {
-                            group.stories.forEach(story => {
-                                text += `* [${story.source}]: ${story.angle}\n`;
-                            });
-                        }
-                        text += `\n`;
-                    });
-                }
-                if (analysis.remaining_stories && analysis.remaining_stories.length > 0) {
-                    text += `**In Brief:**\n`;
-                    analysis.remaining_stories.forEach(story => {
-                        text += `* ${story.headline}\n`;
-                    });
-                }
-                navigator.clipboard.writeText(text).then(() => {
+                const formattedText = generateFormattedSummary();
+                navigator.clipboard.writeText(formattedText).then(() => {
                     setCopySuccess(true);
                     setTimeout(() => setCopySuccess(false), 3000);
+                    // Track analytics
+                    if (window.posthog) {
+                        posthog.capture('copy_summary_clicked', {
+                            story_groups_count: analysis.story_groups?.length || 0,
+                            remaining_stories_count: analysis.remaining_stories?.length || 0,
+                            format: 'enhanced'
+                        });
+                    }
                 });
+            };
+
+            const handleDownloadPDF = () => {
+                if (!analysis) return;
+                const formattedText = generateFormattedSummary();
+                
+                // Create a printable HTML version
+                const printWindow = window.open('', '_blank');
+                const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+                
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>My Anchor Briefing - ${today}</title>
+                        <style>
+                            @media print {
+                                @page { margin: 1in; }
+                            }
+                            body {
+                                font-family: 'Georgia', serif;
+                                line-height: 1.6;
+                                color: #1e293b;
+                                max-width: 800px;
+                                margin: 0 auto;
+                                padding: 40px 20px;
+                            }
+                            .header {
+                                text-align: center;
+                                border-bottom: 3px solid #0ea5e9;
+                                padding-bottom: 20px;
+                                margin-bottom: 40px;
+                            }
+                            .header h1 {
+                                font-size: 32px;
+                                color: #0ea5e9;
+                                margin: 0 0 10px 0;
+                            }
+                            .header .subtitle {
+                                font-size: 14px;
+                                color: #64748b;
+                                font-style: italic;
+                            }
+                            .date {
+                                font-size: 16px;
+                                color: #475569;
+                                margin-top: 10px;
+                            }
+                            .section-title {
+                                font-size: 24px;
+                                color: #0f172a;
+                                border-bottom: 2px solid #e2e8f0;
+                                padding-bottom: 10px;
+                                margin: 30px 0 20px 0;
+                            }
+                            .story {
+                                margin-bottom: 30px;
+                                page-break-inside: avoid;
+                            }
+                            .story-number {
+                                display: inline-block;
+                                background: #0ea5e9;
+                                color: white;
+                                width: 30px;
+                                height: 30px;
+                                border-radius: 50%;
+                                text-align: center;
+                                line-height: 30px;
+                                font-weight: bold;
+                                margin-right: 10px;
+                            }
+                            .story-headline {
+                                font-size: 20px;
+                                font-weight: bold;
+                                color: #0f172a;
+                                margin-bottom: 10px;
+                            }
+                            .story-summary {
+                                font-size: 16px;
+                                color: #334155;
+                                margin-bottom: 15px;
+                                text-align: justify;
+                            }
+                            .perspectives {
+                                background: #f8fafc;
+                                border-left: 4px solid #0ea5e9;
+                                padding: 15px;
+                                margin-top: 10px;
+                            }
+                            .perspectives-title {
+                                font-size: 14px;
+                                font-weight: bold;
+                                color: #64748b;
+                                margin-bottom: 10px;
+                                text-transform: uppercase;
+                                letter-spacing: 0.5px;
+                            }
+                            .perspective {
+                                font-size: 14px;
+                                color: #475569;
+                                margin-bottom: 8px;
+                                padding-left: 20px;
+                                position: relative;
+                            }
+                            .perspective::before {
+                                content: "▸";
+                                position: absolute;
+                                left: 0;
+                                color: #0ea5e9;
+                            }
+                            .source {
+                                font-weight: bold;
+                                color: #0ea5e9;
+                            }
+                            .brief-items {
+                                columns: 2;
+                                column-gap: 30px;
+                            }
+                            .brief-item {
+                                font-size: 14px;
+                                color: #475569;
+                                margin-bottom: 10px;
+                                break-inside: avoid;
+                                padding-left: 20px;
+                                position: relative;
+                            }
+                            .brief-item::before {
+                                content: "•";
+                                position: absolute;
+                                left: 0;
+                                color: #0ea5e9;
+                                font-weight: bold;
+                            }
+                            .footer {
+                                text-align: center;
+                                margin-top: 50px;
+                                padding-top: 20px;
+                                border-top: 2px solid #e2e8f0;
+                                font-size: 12px;
+                                color: #94a3b8;
+                            }
+                            .footer .logo {
+                                font-size: 18px;
+                                font-weight: bold;
+                                color: #0ea5e9;
+                                margin-bottom: 5px;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <h1>MY ANCHOR</h1>
+                            <div class="subtitle">Your AI News Analyst</div>
+                            <div class="date">${today}</div>
+                        </div>
+                `);
+                
+                // Top Stories
+                if (analysis.story_groups && analysis.story_groups.length > 0) {
+                    printWindow.document.write('<h2 class="section-title">📰 Top Stories</h2>');
+                    
+                    analysis.story_groups.forEach((group, index) => {
+                        printWindow.document.write(`
+                            <div class="story">
+                                <div class="story-headline">
+                                    <span class="story-number">${index + 1}</span>
+                                    ${group.group_headline}
+                                </div>
+                                <div class="story-summary">${group.group_summary}</div>
+                        `);
+                        
+                        if (group.stories && group.stories.length > 0) {
+                            printWindow.document.write('<div class="perspectives">');
+                            printWindow.document.write('<div class="perspectives-title">Source Perspectives</div>');
+                            group.stories.forEach(story => {
+                                const source = story.source.split('<')[0].trim().replace('.com', '');
+                                printWindow.document.write(`
+                                    <div class="perspective">
+                                        <span class="source">${source}:</span> ${story.angle}
+                                    </div>
+                                `);
+                            });
+                            printWindow.document.write('</div>');
+                        }
+                        
+                        printWindow.document.write('</div>');
+                    });
+                }
+                
+                // In Brief
+                if (analysis.remaining_stories && analysis.remaining_stories.length > 0) {
+                    printWindow.document.write('<h2 class="section-title">📌 In Brief</h2>');
+                    printWindow.document.write('<div class="brief-items">');
+                    analysis.remaining_stories.forEach(story => {
+                        printWindow.document.write(`<div class="brief-item">${story.headline}</div>`);
+                    });
+                    printWindow.document.write('</div>');
+                }
+                
+                // Footer
+                printWindow.document.write(`
+                        <div class="footer">
+                            <div class="logo">MY ANCHOR</div>
+                            <div>Generated on ${new Date().toLocaleString('en-US')}</div>
+                            <div>https://myanchor.app</div>
+                        </div>
+                    </body>
+                    </html>
+                `);
+                
+                printWindow.document.close();
+                
+                // Trigger print dialog after short delay
+                setTimeout(() => {
+                    printWindow.print();
+                }, 250);
+                
+                // Track analytics
+                if (window.posthog) {
+                    posthog.capture('pdf_downloaded', {
+                        story_groups_count: analysis.story_groups?.length || 0,
+                        remaining_stories_count: analysis.remaining_stories?.length || 0
+                    });
+                }
             };
 
             const handleToggleSpeed = () => {
@@ -559,7 +857,12 @@
                                     {analysis && (
                                         <button onClick={handleCopySummary} className="p-3 text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors relative" title="Copy Executive Summary">
                                             {copySuccess ? <Icons.Check /> : <Icons.Copy />}
-                                            {copySuccess && <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs py-1 px-2 rounded opacity-100 transition-opacity whitespace-nowrap">Copied Text!</span>}
+                                            {copySuccess && <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs py-1 px-2 rounded opacity-100 transition-opacity whitespace-nowrap">Copied!</span>}
+                                        </button>
+                                    )}
+                                    {analysis && (
+                                        <button onClick={handleDownloadPDF} className="p-3 text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors relative" title="Download as PDF">
+                                            <Icons.Download />
                                         </button>
                                     )}
                                     {analysis && (
@@ -658,6 +961,58 @@
             );
         };
 
+        // Error Boundary Component
+        class ErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false, error: null };
+            }
+
+            static getDerivedStateFromError(error) {
+                return { hasError: true, error };
+            }
+
+            componentDidCatch(error, errorInfo) {
+                console.error('React Error Boundary caught error:', error, errorInfo);
+                // Send to Sentry if available
+                if (window.Sentry) {
+                    Sentry.captureException(error, {
+                        contexts: { react: { componentStack: errorInfo.componentStack } }
+                    });
+                }
+                // Send to PostHog if available
+                if (window.posthog) {
+                    posthog.capture('react_error', {
+                        error: error.toString(),
+                        componentStack: errorInfo.componentStack
+                    });
+                }
+            }
+
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
+                            <div className="max-w-md w-full bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 p-8 text-center">
+                                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full mx-auto flex items-center justify-center mb-4">
+                                    <Icons.Alert />
+                                </div>
+                                <h2 className="text-2xl font-serif font-bold text-slate-900 dark:text-white mb-2">Something went wrong</h2>
+                                <p className="text-slate-500 dark:text-slate-400 mb-6">We've been notified and are looking into it.</p>
+                                <button 
+                                    onClick={() => window.location.reload()} 
+                                    className="px-6 py-3 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors font-medium"
+                                >
+                                    Reload Page
+                                </button>
+                            </div>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
+
         // Main App Component
         const App = () => {
             const [isLoading, setIsLoading] = React.useState(true);
@@ -710,7 +1065,14 @@
         };
 
         const container = document.getElementById('root');
-        if (container) { const root = ReactDOM.createRoot(container); root.render(<App />); }
+        if (container) { 
+            const root = ReactDOM.createRoot(container); 
+            root.render(
+                <ErrorBoundary>
+                    <App />
+                </ErrorBoundary>
+            ); 
+        }
     </script>
 </body>
 </html>
