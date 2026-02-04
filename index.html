@@ -36,6 +36,12 @@
         }
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <!-- PostHog Analytics -->
+    <script>
+        !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures getActiveMatchingSurveys getSurveys onSessionId".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
+        // TODO: Replace with your PostHog API key from https://app.posthog.com/project/settings
+        posthog.init('phc_DdcJ4gpfXZKcv0Pxw1wf705hM7Hbh5UJDjY5gpAsNO9', {api_host: 'https://app.posthog.com'});
+    </script>
     <style>
         body { font-family: 'Inter', sans-serif; }
         h1, h2, h3, h4 { font-family: 'Merriweather', serif; }
@@ -324,8 +330,14 @@
             }, [darkMode]);
 
             React.useEffect(() => {
+                // #region agent log
+                fetch('http://127.0.0.1:7242/ingest/1fa21d40-7576-4c9a-88c0-f9d95cae9cbd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:332',message:'useEffect audioSrc/playbackRate',data:{audioRefExists:audioRef.current !== null,audioSrc:audioSrc !== null,playbackRate:playbackRate},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                // #endregion
                 if (audioRef.current) {
                     audioRef.current.playbackRate = playbackRate;
+                    // #region agent log
+                    fetch('http://127.0.0.1:7242/ingest/1fa21d40-7576-4c9a-88c0-f9d95cae9cbd',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:334',message:'Set playbackRate',data:{playbackRate:playbackRate,audioSrc:audioRef.current.src},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+                    // #endregion
                 }
             }, [audioSrc, playbackRate]);
 
@@ -349,23 +361,58 @@
                         body: JSON.stringify(newSettings),
                         credentials: 'include'
                     });
-                    if (res.ok) setSettings(newSettings);
+                    if (res.ok) {
+                        setSettings(newSettings);
+                        // Track analytics
+                        if (window.posthog) {
+                            posthog.capture('settings_updated', {
+                                personality: newSettings.personality,
+                                source_count: newSettings.sources?.length || 0,
+                                has_keywords: (newSettings.keywords?.length || 0) > 0,
+                                has_priority_sources: (newSettings.priority_sources?.length || 0) > 0,
+                                time_window_hours: newSettings.time_window_hours
+                            });
+                            // Update user properties
+                            posthog.identify(undefined, {
+                                personality: newSettings.personality,
+                                source_count: newSettings.sources?.length || 0
+                            });
+                        }
+                    }
                 } catch (e) { setError("Failed to save settings."); }
             };
 
             const handleFetchAndAnalyze = async () => {
                 setIsFetching(true); setAnalysis(null); setAudioSrc(null); setError(null); setShareUrl(null);
+                const startTime = Date.now();
                 try {
                     const res = await fetch(`${backendUrl}/api/fetch_emails`, { credentials: 'include' });
                     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-                    setAnalysis(await res.json());
-                } catch (e) { setError(e.message); } 
+                    const data = await res.json();
+                    setAnalysis(data);
+                    const generationTime = Date.now() - startTime;
+                    // Track analytics
+                    if (window.posthog) {
+                        posthog.capture('briefing_generated', {
+                            generation_time_ms: generationTime,
+                            story_groups_count: data.story_groups?.length || 0,
+                            remaining_stories_count: data.remaining_stories?.length || 0,
+                            cache_hit: generationTime < 2000 // Likely cache hit if < 2s
+                        });
+                    }
+                } catch (e) { 
+                    setError(e.message);
+                    if (window.posthog) {
+                        posthog.capture('briefing_generation_failed', { error: e.message });
+                    }
+                } 
                 finally { setIsFetching(false); }
             };
 
             const handleGenerateAudio = async () => {
                 if (!analysis) return;
                 setIsGeneratingAudio(true); setError(null);
+                const startTime = Date.now();
                 try {
                     const res = await fetch(`${backendUrl}/api/generate_audio`, {
                         method: 'POST',
@@ -376,7 +423,30 @@
                     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
                     const data = await res.json();
                     setAudioSrc(`data:audio/mp3;base64,${data.audio_content}`);
-                } catch (e) { setError(e.message); } 
+                    const generationTime = Date.now() - startTime;
+                    // Track analytics
+                    if (window.posthog) {
+                        posthog.capture('audio_played', {
+                            generation_time_ms: generationTime,
+                            personality: settings.personality || 'anchor'
+                        });
+                        // Track audio completion when it ends
+                        if (audioRef.current) {
+                            audioRef.current.addEventListener('ended', () => {
+                                if (window.posthog) {
+                                    posthog.capture('audio_completed', {
+                                        personality: settings.personality || 'anchor'
+                                    });
+                                }
+                            }, { once: true });
+                        }
+                    }
+                } catch (e) { 
+                    setError(e.message);
+                    if (window.posthog) {
+                        posthog.capture('audio_generation_failed', { error: e.message });
+                    }
+                } 
                 finally { setIsGeneratingAudio(false); }
             };
 
@@ -395,7 +465,13 @@
                         const url = `${window.location.origin}/?share=${data.share_id}`;
                         navigator.clipboard.writeText(url);
                         setShareUrl(url);
-                        setTimeout(() => setShareUrl(null), 3000); 
+                        setTimeout(() => setShareUrl(null), 3000);
+                        // Track analytics
+                        if (window.posthog) {
+                            posthog.capture('share_clicked', {
+                                story_groups_count: analysis.story_groups?.length || 0
+                            });
+                        }
                     }
                 } catch (e) { console.error("Share error:", e); }
                 finally { setIsSharing(false); }
@@ -581,6 +657,58 @@
                 </div>
             );
         };
+
+        // Main App Component
+        const App = () => {
+            const [isLoading, setIsLoading] = React.useState(true);
+            const [isLoggedIn, setIsLoggedIn] = React.useState(false);
+            const [userInfo, setUserInfo] = React.useState(null);
+            const [sharedData, setSharedData] = React.useState(null);
+
+            React.useEffect(() => {
+                // Check for shared briefing in URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const shareId = urlParams.get('share');
+                
+                if (shareId) {
+                    // Load shared briefing
+                    fetch(`${backendUrl}/api/shared/${shareId}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            setSharedData(data);
+                            setIsLoading(false);
+                        })
+                        .catch(() => setIsLoading(false));
+                } else {
+                    // Check authentication
+                    fetch(`${backendUrl}/api/check_auth`, { credentials: 'include' })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.logged_in) {
+                                setIsLoggedIn(true);
+                                setUserInfo(data.user);
+                            }
+                            setIsLoading(false);
+                        })
+                        .catch(() => setIsLoading(false));
+                }
+            }, []);
+
+            if (isLoading) {
+                return <LoadingState text="Loading..." />;
+            }
+
+            if (sharedData) {
+                return <Dashboard userInfo={null} sharedData={sharedData} />;
+            }
+
+            if (!isLoggedIn) {
+                return <LoginPage />;
+            }
+
+            return <Dashboard userInfo={userInfo} sharedData={null} />;
+        };
+
         const container = document.getElementById('root');
         if (container) { const root = ReactDOM.createRoot(container); root.render(<App />); }
     </script>
