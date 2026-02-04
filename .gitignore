@@ -23,3 +23,14 @@ OS generated files
 
 .DS_Store
 Thumbs.db
+
+# Local documentation (not for GitHub)
+Docs/
+Tasks/
+Research/
+AGENTS.md
+GOALS.md
+BUG-TESTING-GUIDE.md
+TODAYS-ACCOMPLISHMENTS.md
+QUICK-WINS-SUMMARY.md
+SENTRY-SETUP.md
