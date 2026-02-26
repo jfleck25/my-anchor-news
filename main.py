@@ -388,7 +388,15 @@ def logout():
 
 @app.route('/api/check_auth')
 def check_auth():
+    # #region agent log
+    _log = {"sessionId":"4b162f","location":"main.py:check_auth","data":{"has_credentials":"credentials" in session}}
+    print(f"[DEBUG 4b162f] {json.dumps(_log)}", flush=True)
+    # #endregion
     user_info = get_user_info()
+    # #region agent log
+    _log2 = {"sessionId":"4b162f","location":"main.py:check_auth","message":"result","data":{"has_user_info":user_info is not None}}
+    print(f"[DEBUG 4b162f] {json.dumps(_log2)}", flush=True)
+    # #endregion
     return jsonify({'logged_in': True, 'user': user_info}) if user_info else jsonify({'logged_in': False})
 
 @app.route('/api/settings', methods=['GET'])

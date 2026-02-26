@@ -90,6 +90,9 @@
     <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/babel">
+        // #region agent log
+        try { const _d={sessionId:'4b162f',location:'index.html:script.start',message:'React script loaded',hypothesisId:'D'}; console.log('[DEBUG 4b162f]',JSON.stringify(_d)); fetch('http://127.0.0.1:7242/ingest/1fa21d40-7576-4c9a-88c0-f9d95cae9cbd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b162f'},body:JSON.stringify({..._d,data:{},timestamp:Date.now()})}).catch(()=>{}); } catch(e) {}
+        // #endregion
         // --- Configuration ---
         const backendUrl = ""; 
 
@@ -328,6 +331,9 @@
         );
 
         const Dashboard = ({ userInfo, sharedData }) => {
+            // #region agent log
+            React.useEffect(() => { const _d={sessionId:'4b162f',location:'index.html:Dashboard.mount',message:'Dashboard mounted',data:{hasUserInfo:!!userInfo,hasSharedData:!!sharedData},hypothesisId:'C,D'}; console.log('[DEBUG 4b162f]',JSON.stringify(_d)); fetch('http://127.0.0.1:7242/ingest/1fa21d40-7576-4c9a-88c0-f9d95cae9cbd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b162f'},body:JSON.stringify({..._d,timestamp:Date.now()})}).catch(()=>{}); }, []);
+            // #endregion
             const [analysis, setAnalysis] = React.useState(sharedData || null);
             const [audioSrc, setAudioSrc] = React.useState(null);
             const [isFetching, setIsFetching] = React.useState(false);
@@ -1032,6 +1038,9 @@
             const [sharedData, setSharedData] = React.useState(null);
 
             React.useEffect(() => {
+                // #region agent log
+                const _d={sessionId:'4b162f',location:'index.html:App.useEffect',message:'App useEffect started',data:{hasShare:!!new URLSearchParams(window.location.search).get('share')},hypothesisId:'A,B'}; console.log('[DEBUG 4b162f]',JSON.stringify(_d)); fetch('http://127.0.0.1:7242/ingest/1fa21d40-7576-4c9a-88c0-f9d95cae9cbd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b162f'},body:JSON.stringify({..._d,timestamp:Date.now()})}).catch(()=>{});
+                // #endregion
                 // Check for shared briefing in URL
                 const urlParams = new URLSearchParams(window.location.search);
                 const shareId = urlParams.get('share');
@@ -1041,25 +1050,54 @@
                     fetch(`${backendUrl}/api/shared/${shareId}`)
                         .then(res => res.json())
                         .then(data => {
+                            // #region agent log
+                            const _d={sessionId:'4b162f',location:'index.html:shared',message:'Shared data loaded',hypothesisId:'E'}; console.log('[DEBUG 4b162f]',JSON.stringify(_d)); fetch('http://127.0.0.1:7242/ingest/1fa21d40-7576-4c9a-88c0-f9d95cae9cbd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b162f'},body:JSON.stringify({..._d,data:{},timestamp:Date.now()})}).catch(()=>{});
+                            // #endregion
                             setSharedData(data);
                             setIsLoading(false);
                         })
-                        .catch(() => setIsLoading(false));
+                        .catch((e) => {
+                            // #region agent log
+                            const _d={sessionId:'4b162f',location:'index.html:shared.catch',message:'Shared fetch failed',data:{error:String(e)},hypothesisId:'B'}; console.log('[DEBUG 4b162f]',JSON.stringify(_d)); fetch('http://127.0.0.1:7242/ingest/1fa21d40-7576-4c9a-88c0-f9d95cae9cbd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b162f'},body:JSON.stringify({..._d,timestamp:Date.now()})}).catch(()=>{});
+                            // #endregion
+                            setIsLoading(false);
+                        });
                 } else {
                     // Check authentication
-                    fetch(`${backendUrl}/api/check_auth`, { credentials: 'include' })
-                        .then(res => res.json())
+                    const checkAuthUrl = `${backendUrl}/api/check_auth`;
+                    // #region agent log
+                    const _d={sessionId:'4b162f',location:'index.html:check_auth',message:'Fetching check_auth',data:{url:checkAuthUrl},hypothesisId:'B'}; console.log('[DEBUG 4b162f]',JSON.stringify(_d)); fetch('http://127.0.0.1:7242/ingest/1fa21d40-7576-4c9a-88c0-f9d95cae9cbd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b162f'},body:JSON.stringify({..._d,timestamp:Date.now()})}).catch(()=>{});
+                    // #endregion
+                    fetch(checkAuthUrl, { credentials: 'include' })
+                        .then(res => {
+                            // #region agent log
+                            const _d={sessionId:'4b162f',location:'index.html:check_auth.res',message:'check_auth response',data:{status:res.status,ok:res.ok},hypothesisId:'A,B'}; console.log('[DEBUG 4b162f]',JSON.stringify(_d)); fetch('http://127.0.0.1:7242/ingest/1fa21d40-7576-4c9a-88c0-f9d95cae9cbd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b162f'},body:JSON.stringify({..._d,timestamp:Date.now()})}).catch(()=>{});
+                            // #endregion
+                            return res.json();
+                        })
                         .then(data => {
+                            // #region agent log
+                            const _d={sessionId:'4b162f',location:'index.html:check_auth.data',message:'check_auth data',data:{logged_in:data.logged_in,hasUser:!!data.user},hypothesisId:'A'}; console.log('[DEBUG 4b162f]',JSON.stringify(_d)); fetch('http://127.0.0.1:7242/ingest/1fa21d40-7576-4c9a-88c0-f9d95cae9cbd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b162f'},body:JSON.stringify({..._d,timestamp:Date.now()})}).catch(()=>{});
+                            // #endregion
                             if (data.logged_in) {
                                 setIsLoggedIn(true);
                                 setUserInfo(data.user);
                             }
                             setIsLoading(false);
                         })
-                        .catch(() => setIsLoading(false));
+                        .catch((e) => {
+                            // #region agent log
+                            const _d={sessionId:'4b162f',location:'index.html:check_auth.catch',message:'check_auth fetch failed',data:{error:String(e)},hypothesisId:'B'}; console.log('[DEBUG 4b162f]',JSON.stringify(_d)); fetch('http://127.0.0.1:7242/ingest/1fa21d40-7576-4c9a-88c0-f9d95cae9cbd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b162f'},body:JSON.stringify({..._d,timestamp:Date.now()})}).catch(()=>{});
+                            // #endregion
+                            setIsLoading(false);
+                        });
                 }
             }, []);
 
+            // #region agent log
+            const renderBranch = isLoading ? 'Loading' : (sharedData ? 'SharedDashboard' : (!isLoggedIn ? 'LoginPage' : 'Dashboard'));
+            const _d={sessionId:'4b162f',location:'index.html:App.render',message:'App render branch',data:{branch:renderBranch,isLoading,isLoggedIn,hasShared:!!sharedData},hypothesisId:'E'}; console.log('[DEBUG 4b162f]',JSON.stringify(_d)); if (typeof fetch !== 'undefined') fetch('http://127.0.0.1:7242/ingest/1fa21d40-7576-4c9a-88c0-f9d95cae9cbd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b162f'},body:JSON.stringify({..._d,timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
             if (isLoading) {
                 return <LoadingState text="Loading..." />;
             }
@@ -1082,7 +1120,10 @@
                 <ErrorBoundary>
                     <App />
                 </ErrorBoundary>
-            ); 
+            );
+            // #region agent log
+            const _d={sessionId:'4b162f',location:'index.html:root.render',message:'React root.render called',hypothesisId:'D'}; console.log('[DEBUG 4b162f]',JSON.stringify(_d)); fetch('http://127.0.0.1:7242/ingest/1fa21d40-7576-4c9a-88c0-f9d95cae9cbd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b162f'},body:JSON.stringify({..._d,data:{},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
         }
     </script>
 </body>
