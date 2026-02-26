@@ -12,7 +12,7 @@ import flask
 
 # Load environment variables from .env file
 load_dotenv()
-from flask import request, redirect, session, url_for, jsonify, send_from_directory
+from flask import request, redirect, session, url_for, jsonify, render_template
 from flask_cors import CORS
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -160,7 +160,8 @@ def get_user_info():
     try:
         user_info_service = build('oauth2', 'v2', credentials=credentials)
         return user_info_service.userinfo().get().execute()
-    except: return None
+    except Exception:
+        return None
 
 def load_settings(user_email=None):
     defaults = {
@@ -183,12 +184,16 @@ def load_settings(user_email=None):
                 user_settings = defaults.copy()
                 user_settings.update(row['settings'])
                 return user_settings
-        except: pass
+        except Exception:
+            pass
 
-    if not os.path.exists(SETTINGS_FILE): return defaults
-    try: 
-        with open(SETTINGS_FILE, 'r') as f: return json.load(f)
-    except: return defaults
+    if not os.path.exists(SETTINGS_FILE):
+        return defaults
+    try:
+        with open(SETTINGS_FILE, 'r') as f:
+            return json.load(f)
+    except Exception:
+        return defaults
 
 def save_settings(new_settings, user_email=None):
     if DATABASE_URL and user_email:
@@ -203,12 +208,15 @@ def save_settings(new_settings, user_email=None):
             cur.close()
             conn.close()
             return True
-        except: return False
+        except Exception:
+            return False
             
     try:
-        with open(SETTINGS_FILE, 'w') as f: json.dump(new_settings, f, indent=2)
+        with open(SETTINGS_FILE, 'w') as f:
+            json.dump(new_settings, f, indent=2)
         return True
-    except: return False
+    except Exception:
+        return False
 
 def get_client_secrets_config():
     env_secrets = os.environ.get("GOOGLE_CLIENT_SECRETS_JSON")
@@ -234,7 +242,8 @@ if api_key:
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
-    except: model = None
+    except Exception:
+        model = None
 
 def sanitize_for_llm(text):
     text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
@@ -285,8 +294,11 @@ def analyze_news_with_llm(newsletters_text):
         match = re.search(r'\{.*\}', response.text, re.DOTALL)
         if match: return json.loads(match.group(0))
         else: raise ValueError("No valid JSON found.")
-    except json.JSONDecodeError: return {"error": "Analysis failed due to volume."}
-    except Exception as e: return {"error": "AI analysis failed."}
+    except json.JSONDecodeError:
+        return {"error": "Analysis failed due to volume."}
+    except Exception as e:
+        print(f"LLM analysis error: {e}")
+        return {"error": "AI analysis failed."}
 
 # --- Caching Helpers ---
 def load_cache():
@@ -294,7 +306,7 @@ def load_cache():
     try:
         with open(CACHE_FILE, 'r') as f:
             return json.load(f)
-    except:
+    except Exception:
         return {}
 
 def save_cache(data):
@@ -310,7 +322,11 @@ def get_settings_hash(settings):
 # --- Routes ---
 
 @app.route('/')
-def index(): return send_from_directory('.', 'index.html')
+def index():
+    return render_template('index.html',
+        sentry_dsn_frontend=os.environ.get('SENTRY_DSN_FRONTEND', ''),
+        posthog_api_key=os.environ.get('POSTHOG_API_KEY', '')
+    )
 
 @app.route('/login')
 def login():
@@ -361,10 +377,9 @@ def oauth2callback():
         return redirect("/")
     except Exception as e:
         import traceback
-        error_trace = traceback.format_exc()
         print(f"OAuth callback error: {e}")
-        print(error_trace)
-        return jsonify({'error': f'OAuth callback failed: {str(e)}'}), 500
+        print(traceback.format_exc())
+        return jsonify({'error': 'Login failed. Please try again.'}), 500
 
 @app.route('/logout')
 def logout():
@@ -499,7 +514,14 @@ def fetch_emails():
         if 'script_hash' in cache: del cache['script_hash']
         save_cache(cache)
         return jsonify(analysis_result)
-    except Exception as e: return jsonify({'error': str(e)}), 500
+    except Exception as e:
+        err_msg = str(e).lower()
+        if 'quota' in err_msg or 'rate' in err_msg or '429' in err_msg:
+            return jsonify({'error': "Gmail rate limit reached. Please try again in a few minutes."}), 429
+        if 'credentials' in err_msg or 'token' in err_msg or '401' in err_msg:
+            return jsonify({'error': "Your session expired. Please log in again."}), 401
+        print(f"fetch_emails error: {e}")
+        return jsonify({'error': "Unable to fetch newsletters. Please check your connection and try again."}), 500
 
 @app.route('/api/generate_audio', methods=['POST'])
 def generate_audio():
@@ -517,37 +539,55 @@ def generate_audio():
     try:
         auth_req = google.auth.transport.requests.Request()
         if creds.expired: creds.refresh(auth_req); session['credentials']['token'] = creds.token; session.modified = True
-    except: pass
-    client_opts = None
-    if PROJECT_ID: client_opts = client_options.ClientOptions(quota_project_id=PROJECT_ID)
-    tts_client = texttospeech.TextToSpeechClient(credentials=creds, client_options=client_opts, transport="rest")
-    
-    analysis_data = request.get_json()
-    script_text = generate_script_from_analysis(analysis_data, style)
-    script_hash = hashlib.md5((script_text + style).encode()).hexdigest()
-    cache = load_cache()
-    if cache.get('script_hash') == script_hash and cache.get('audio'): return jsonify({"audio_content": cache['audio']})
-    
-    sentences = re.split(r'(?<=[.!?])\s+', script_text)
-    chunks = []; current_chunk = ""; byte_limit = 4800
-    for sentence in sentences:
-        if len(current_chunk.encode('utf-8')) + len(sentence.encode('utf-8')) + 1 < byte_limit: current_chunk += sentence + " "
-        else: 
-            if current_chunk: chunks.append(current_chunk)
-            current_chunk = sentence + " "
-    if current_chunk: chunks.append(current_chunk)
-    
-    persona_config = PERSONAS.get(style, PERSONAS['anchor'])
-    voice = texttospeech.VoiceSelectionParams(language_code="en-US", name=persona_config['voice_name'], ssml_gender=persona_config['gender'])
-    audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3, speaking_rate=persona_config.get('speaking_rate', 1.0), pitch=persona_config.get('pitch', 0.0))
-    all_audio_content = b""
-    for chunk_text in chunks:
-        if len(chunk_text.encode('utf-8')) > byte_limit: chunk_text = chunk_text.encode('utf-8')[:byte_limit].decode('utf-8', 'ignore')
-        response = tts_client.synthesize_speech(input=texttospeech.SynthesisInput(text=chunk_text), voice=voice, audio_config=audio_config)
-        all_audio_content += response.audio_content
-    audio_base64 = base64.b64encode(all_audio_content).decode('utf-8')
-    cache['script_hash'] = script_hash; cache['audio'] = audio_base64; save_cache(cache)
-    return jsonify({"audio_content": audio_base64})
+    except Exception:
+        pass
+    try:
+        client_opts = None
+        if PROJECT_ID: client_opts = client_options.ClientOptions(quota_project_id=PROJECT_ID)
+        tts_client = texttospeech.TextToSpeechClient(credentials=creds, client_options=client_opts, transport="rest")
+
+        analysis_data = request.get_json()
+        if not analysis_data:
+            return jsonify({'error': 'No briefing data to convert to audio.'}), 400
+        script_text = generate_script_from_analysis(analysis_data, style)
+        script_hash = hashlib.md5((script_text + style).encode()).hexdigest()
+        cache = load_cache()
+        if cache.get('script_hash') == script_hash and cache.get('audio'):
+            return jsonify({"audio_content": cache['audio']})
+
+        sentences = re.split(r'(?<=[.!?])\s+', script_text)
+        chunks = []
+        current_chunk = ""
+        byte_limit = 4800
+        for sentence in sentences:
+            if len(current_chunk.encode('utf-8')) + len(sentence.encode('utf-8')) + 1 < byte_limit:
+                current_chunk += sentence + " "
+            else:
+                if current_chunk: chunks.append(current_chunk)
+                current_chunk = sentence + " "
+        if current_chunk: chunks.append(current_chunk)
+
+        persona_config = PERSONAS.get(style, PERSONAS['anchor'])
+        voice = texttospeech.VoiceSelectionParams(language_code="en-US", name=persona_config['voice_name'], ssml_gender=persona_config['gender'])
+        audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3, speaking_rate=persona_config.get('speaking_rate', 1.0), pitch=persona_config.get('pitch', 0.0))
+        all_audio_content = b""
+        for chunk_text in chunks:
+            if len(chunk_text.encode('utf-8')) > byte_limit: chunk_text = chunk_text.encode('utf-8')[:byte_limit].decode('utf-8', 'ignore')
+            response = tts_client.synthesize_speech(input=texttospeech.SynthesisInput(text=chunk_text), voice=voice, audio_config=audio_config)
+            all_audio_content += response.audio_content
+        audio_base64 = base64.b64encode(all_audio_content).decode('utf-8')
+        cache['script_hash'] = script_hash
+        cache['audio'] = audio_base64
+        save_cache(cache)
+        return jsonify({"audio_content": audio_base64})
+    except Exception as e:
+        err_msg = str(e).lower()
+        if 'quota' in err_msg or '429' in err_msg:
+            return jsonify({'error': 'Text-to-speech quota exceeded. Please try again later.'}), 429
+        if 'credentials' in err_msg or 'token' in err_msg or '401' in err_msg:
+            return jsonify({'error': 'Your session expired. Please log in again.'}), 401
+        print(f"generate_audio error: {e}")
+        return jsonify({'error': 'Unable to generate audio. Please try again.'}), 500
 
 # --- Share Endpoints ---
 @app.route('/api/share', methods=['POST'])
@@ -563,7 +603,8 @@ def share_briefing():
             cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(data)))
             conn.commit(); cur.close(); conn.close()
             return jsonify({'share_id': share_id})
-        except: return jsonify({'error': 'DB error'}), 500
+        except Exception:
+            return jsonify({'error': 'Unable to save shared briefing. Please try again.'}), 500
     return jsonify({'error': 'DB not configured'}), 500
 
 @app.route('/api/shared/<share_id>', methods=['GET'])
@@ -576,7 +617,7 @@ def get_shared_briefing(share_id):
             row = cur.fetchone(); cur.close(); conn.close()
             if row: return jsonify(row['data'])
             return jsonify({'error': 'This shared briefing could not be found. The link may be invalid or expired.'}), 404
-        except: 
+        except Exception:
             return jsonify({'error': 'Unable to load shared briefing. Please try again.'}), 500
     return jsonify({'error': 'Shared briefings are not available. Database connection required.'}), 500
 
