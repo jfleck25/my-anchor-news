@@ -825,14 +825,8 @@
                 const nextSpeed = speeds[(currentIndex + 1) % speeds.length];
                 setPlaybackRate(nextSpeed);
             };
-            // #region agent log
-            console.log('[DEBUG 4b162f] Dashboard about to return JSX', { isFetching, hasAnalysis: !!analysis });
-            // #endregion
             return (
                 <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-32">
-                    {/* #region agent log - visible debug strip (inline styles = no Tailwind) */}
-                    <div style={{position:'fixed',top:0,left:0,right:0,background:'red',color:'white',padding:'4px 8px',fontSize:'12px',zIndex:99999}}>Dashboard rendered</div>
-                    {/* #endregion */}
                     <nav className="glass sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800">
                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                             <div className="flex justify-between h-16">
