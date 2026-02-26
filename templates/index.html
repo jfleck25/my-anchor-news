@@ -94,7 +94,8 @@
         try { const _d={sessionId:'4b162f',location:'index.html:script.start',message:'React script loaded',hypothesisId:'D'}; console.log('[DEBUG 4b162f]',JSON.stringify(_d)); fetch('http://127.0.0.1:7242/ingest/1fa21d40-7576-4c9a-88c0-f9d95cae9cbd',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'4b162f'},body:JSON.stringify({..._d,data:{},timestamp:Date.now()})}).catch(()=>{}); } catch(e) {}
         // #endregion
         // --- Configuration ---
-        const backendUrl = ""; 
+        const backendUrl = "";
+        const ph = (fn, ...args) => { try { if (window.posthog && typeof window.posthog[fn] === 'function') return window.posthog[fn](...args); } catch(e) {} };
 
         // --- Icons ---
         const Icons = {
@@ -378,9 +379,7 @@
 
             // Identify user in PostHog when we have userInfo (triggers on login / Dashboard load)
             React.useEffect(() => {
-                if (window.posthog && userInfo?.email && !sharedData) {
-                    posthog.identify(userInfo.email, { email: userInfo.email });
-                }
+                if (userInfo?.email && !sharedData) ph('identify', userInfo.email, { email: userInfo.email });
             }, [userInfo?.email, sharedData]);
 
             const handleSaveSettings = async (newSettings) => {
@@ -393,21 +392,17 @@
                     });
                     if (res.ok) {
                         setSettings(newSettings);
-                        // Track analytics
-                        if (window.posthog) {
-                            posthog.capture('settings_updated', {
-                                personality: newSettings.personality,
-                                source_count: newSettings.sources?.length || 0,
-                                has_keywords: (newSettings.keywords?.length || 0) > 0,
-                                has_priority_sources: (newSettings.priority_sources?.length || 0) > 0,
-                                time_window_hours: newSettings.time_window_hours
-                            });
-                            // Update user properties
-                            posthog.identify(userInfo?.email || posthog.get_distinct_id(), {
-                                personality: newSettings.personality,
-                                source_count: newSettings.sources?.length || 0
-                            });
-                        }
+                        ph('capture', 'settings_updated', {
+                            personality: newSettings.personality,
+                            source_count: newSettings.sources?.length || 0,
+                            has_keywords: (newSettings.keywords?.length || 0) > 0,
+                            has_priority_sources: (newSettings.priority_sources?.length || 0) > 0,
+                            time_window_hours: newSettings.time_window_hours
+                        });
+                        ph('identify', userInfo?.email || (typeof window.posthog?.get_distinct_id === 'function' ? window.posthog.get_distinct_id() : null), {
+                            personality: newSettings.personality,
+                            source_count: newSettings.sources?.length || 0
+                        });
                     }
                 } catch (e) { setError("Unable to save settings. Please check your connection and try again."); }
             };
@@ -428,20 +423,15 @@
                     const data = await res.json();
                     setAnalysis(data);
                     const generationTime = Date.now() - startTime;
-                    // Track analytics
-                    if (window.posthog) {
-                        posthog.capture('briefing_generated', {
-                            generation_time_ms: generationTime,
-                            story_groups_count: data.story_groups?.length || 0,
-                            remaining_stories_count: data.remaining_stories?.length || 0,
-                            cache_hit: generationTime < 2000 // Likely cache hit if < 2s
-                        });
-                    }
+                    ph('capture', 'briefing_generated', {
+                        generation_time_ms: generationTime,
+                        story_groups_count: data.story_groups?.length || 0,
+                        remaining_stories_count: data.remaining_stories?.length || 0,
+                        cache_hit: generationTime < 2000
+                    });
                 } catch (e) { 
                     setError(e.message);
-                    if (window.posthog) {
-                        posthog.capture('briefing_generation_failed', { error: e.message });
-                    }
+                    ph('capture', 'briefing_generation_failed', { error: e.message });
                 } 
                 finally { setIsFetching(false); }
             };
@@ -467,28 +457,18 @@
                     const data = await res.json();
                     setAudioSrc(`data:audio/mp3;base64,${data.audio_content}`);
                     const generationTime = Date.now() - startTime;
-                    // Track analytics
-                    if (window.posthog) {
-                        posthog.capture('audio_played', {
-                            generation_time_ms: generationTime,
-                            personality: settings.personality || 'anchor'
-                        });
-                        // Track audio completion when it ends
-                        if (audioRef.current) {
-                            audioRef.current.addEventListener('ended', () => {
-                                if (window.posthog) {
-                                    posthog.capture('audio_completed', {
-                                        personality: settings.personality || 'anchor'
-                                    });
-                                }
-                            }, { once: true });
-                        }
+                    ph('capture', 'audio_played', {
+                        generation_time_ms: generationTime,
+                        personality: settings.personality || 'anchor'
+                    });
+                    if (audioRef.current) {
+                        audioRef.current.addEventListener('ended', () => {
+                            ph('capture', 'audio_completed', { personality: settings.personality || 'anchor' });
+                        }, { once: true });
                     }
                 } catch (e) { 
                     setError(e.message);
-                    if (window.posthog) {
-                        posthog.capture('audio_generation_failed', { error: e.message });
-                    }
+                    ph('capture', 'audio_generation_failed', { error: e.message });
                 } 
                 finally { setIsGeneratingAudio(false); }
             };
@@ -509,12 +489,7 @@
                         navigator.clipboard.writeText(url);
                         setShareUrl(url);
                         setTimeout(() => setShareUrl(null), 3000);
-                        // Track analytics
-                        if (window.posthog) {
-                            posthog.capture('share_clicked', {
-                                story_groups_count: analysis.story_groups?.length || 0
-                            });
-                        }
+                        ph('capture', 'share_clicked', { story_groups_count: analysis.story_groups?.length || 0 });
                     } else {
                         const errData = await res.json().catch(() => ({}));
                         setError(errData.error || 'Unable to share briefing. Please try again.');
@@ -581,18 +556,15 @@
             const handleCopySummary = () => {
                 if (!analysis) return;
                 const formattedText = generateFormattedSummary();
-                navigator.clipboard.writeText(formattedText).then(() => {
-                    setCopySuccess(true);
-                    setTimeout(() => setCopySuccess(false), 3000);
-                    // Track analytics
-                    if (window.posthog) {
-                        posthog.capture('copy_summary_clicked', {
+                    navigator.clipboard.writeText(formattedText).then(() => {
+                        setCopySuccess(true);
+                        setTimeout(() => setCopySuccess(false), 3000);
+                        ph('capture', 'copy_summary_clicked', {
                             story_groups_count: analysis.story_groups?.length || 0,
                             remaining_stories_count: analysis.remaining_stories?.length || 0,
                             format: 'enhanced'
                         });
-                    }
-                });
+                    });
             };
 
             const handleDownloadPDF = () => {
@@ -810,13 +782,10 @@
                     printWindow.print();
                 }, 250);
                 
-                // Track analytics
-                if (window.posthog) {
-                    posthog.capture('pdf_downloaded', {
-                        story_groups_count: analysis.story_groups?.length || 0,
-                        remaining_stories_count: analysis.remaining_stories?.length || 0
-                    });
-                }
+                ph('capture', 'pdf_downloaded', {
+                    story_groups_count: analysis.story_groups?.length || 0,
+                    remaining_stories_count: analysis.remaining_stories?.length || 0
+                });
             };
 
             const handleToggleSpeed = () => {
@@ -996,13 +965,10 @@
                         contexts: { react: { componentStack: errorInfo.componentStack } }
                     });
                 }
-                // Send to PostHog if available
-                if (window.posthog) {
-                    posthog.capture('react_error', {
-                        error: error.toString(),
-                        componentStack: errorInfo.componentStack
-                    });
-                }
+                ph('capture', 'react_error', {
+                    error: error.toString(),
+                    componentStack: errorInfo.componentStack
+                });
             }
 
             render() {
