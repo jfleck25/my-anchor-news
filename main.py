@@ -74,7 +74,9 @@ def handle_500_error(e):
     error_trace = traceback.format_exc()
     print(f"Unhandled 500 error: {e}")
     print(error_trace)
-    return jsonify({'error': f'Internal server error: {str(e)}', 'details': error_trace[:500] if app.config.get('DEBUG') else None}), 500
+    # Don't expose raw upstream (Google/Gemini) errors to client
+    safe_msg = "Something went wrong. Please try again or log in again."
+    return jsonify({'error': safe_msg, 'details': error_trace[:500] if app.config.get('DEBUG') else None}), 500
 
 SCOPES = [
     'https://www.googleapis.com/auth/userinfo.email',
@@ -155,12 +157,14 @@ init_db()
 # --- Helper Functions ---
 
 def get_user_info():
-    if 'credentials' not in session: return None
-    credentials = Credentials(**session['credentials'])
+    if 'credentials' not in session:
+        return None
     try:
+        credentials = Credentials(**session['credentials'])
         user_info_service = build('oauth2', 'v2', credentials=credentials)
         return user_info_service.userinfo().get().execute()
-    except Exception:
+    except Exception as ex:
+        print(f"get_user_info error: {ex}")
         return None
 
 def load_settings(user_email=None):
@@ -401,11 +405,15 @@ def check_auth():
 
 @app.route('/api/settings', methods=['GET'])
 def get_settings():
-    if 'credentials' not in session: 
+    if 'credentials' not in session:
         return jsonify({'error': 'Please log in to view your settings.'}), 401
-    user_info = get_user_info()
-    email = user_info.get('email') if user_info else None
-    return jsonify(load_settings(email))
+    try:
+        user_info = get_user_info()
+        email = user_info.get('email') if user_info else None
+        return jsonify(load_settings(email))
+    except Exception as ex:
+        print(f"get_settings error: {ex}")
+        return jsonify({'error': 'Unable to load settings. Please try again.'}), 500
 
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
