@@ -72,11 +72,12 @@ if os.environ.get("FLASK_ENV") != "production":
 def handle_500_error(e):
     import traceback
     error_trace = traceback.format_exc()
-    print(f"Unhandled 500 error: {e}")
+    path = request.path if request else "unknown"
+    print(f"[500] path={path} error={e}")
     print(error_trace)
     # Don't expose raw upstream (Google/Gemini) errors to client
     safe_msg = "Something went wrong. Please try again or log in again."
-    return jsonify({'error': safe_msg, 'details': error_trace[:500] if app.config.get('DEBUG') else None}), 500
+    return jsonify({'error': safe_msg, 'endpoint': path, 'details': error_trace[:500] if app.config.get('DEBUG') else None}), 500
 
 SCOPES = [
     'https://www.googleapis.com/auth/userinfo.email',
