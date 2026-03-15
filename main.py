@@ -417,9 +417,28 @@ def login():
         print(error_trace)
         return jsonify({'error': f'Login failed: {str(e)}'}), 500
 
+# --- Debug logging for oauth2callback (session e0f0e5) ---
+def _debug_log(location, message, data=None, hypothesis_id=None):
+    payload = {"sessionId": "e0f0e5", "location": location, "message": message, "timestamp": int(time.time() * 1000)}
+    if data is not None:
+        payload["data"] = data
+    if hypothesis_id is not None:
+        payload["hypothesisId"] = hypothesis_id
+    line = json.dumps(payload)
+    try:
+        with open("debug-e0f0e5.log", "a") as _f:
+            _f.write(line + "\n")
+    except Exception:
+        pass
+    # So production (e.g. Render) logs show the same payload without file access
+    print(f"[DEBUG_OAUTH] {line}", flush=True)
+
 @app.route('/oauth2callback')
 def oauth2callback():
     try:
+        # #region agent log
+        _debug_log("main.py:oauth2callback:entry", "oauth2callback entered", {"has_state": "state" in session, "url_path": request.path}, "H5")
+        # #endregion
         if 'state' not in session:
             print("ERROR: State missing from session")
             return jsonify({'error': 'Invalid session state'}), 400
@@ -427,6 +446,9 @@ def oauth2callback():
         
         try:
             config = get_client_secrets_config()
+            # #region agent log
+            _debug_log("main.py:oauth2callback:after_config", "config obtained", {"config_type": "dict" if isinstance(config, dict) else "file"}, "H1")
+            # #endregion
         except FileNotFoundError as config_err:
             print(f"ERROR: Client secrets not found: {config_err}")
             return jsonify({'error': 'OAuth configuration not found. Please check GOOGLE_CLIENT_SECRETS_JSON environment variable or client_secrets.json file.'}), 500
@@ -436,14 +458,26 @@ def oauth2callback():
             flow.redirect_uri = url_for('oauth2callback', _external=True)
         else:
             flow = Flow.from_client_secrets_file(config, scopes=SCOPES, state=state, redirect_uri=url_for('oauth2callback', _external=True))
-        
+        # #region agent log
+        _debug_log("main.py:oauth2callback:after_flow", "flow created", {"redirect_uri": flow.redirect_uri[:50] + "..." if flow.redirect_uri and len(flow.redirect_uri) > 50 else flow.redirect_uri}, "H2")
+        # #endregion
+
         flow.fetch_token(authorization_response=request.url)
+        # #region agent log
+        _debug_log("main.py:oauth2callback:after_fetch_token", "fetch_token ok", {}, "H3")
+        # #endregion
         credentials = flow.credentials
         
         session['credentials'] = {'token': credentials.token, 'refresh_token': credentials.refresh_token, 'token_uri': credentials.token_uri, 'client_id': credentials.client_id, 'client_secret': credentials.client_secret, 'scopes': credentials.scopes}
+        # #region agent log
+        _debug_log("main.py:oauth2callback:after_session", "session credentials stored", {}, "H4")
+        # #endregion
         return redirect("/")
     except Exception as e:
         import traceback
+        # #region agent log
+        _debug_log("main.py:oauth2callback:exception", "oauth2callback exception", {"exc_type": type(e).__name__, "exc_msg": str(e)[:500]}, "H1-H4")
+        # #endregion
         print(f"OAuth callback error: {e}")
         print(traceback.format_exc())
         return jsonify({'error': 'Login failed. Please try again.'}), 500
