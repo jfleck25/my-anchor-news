@@ -3,6 +3,7 @@ import os
 import base64
 import json
 import re
+import secrets
 import time
 import hashlib
 import uuid
@@ -398,12 +399,15 @@ def index():
 @app.route('/login')
 def login():
     try:
+        # PKCE code_verifier must be in session so the callback (possibly another worker) can use it
+        code_verifier = secrets.token_urlsafe(64)
+        session['code_verifier'] = code_verifier
+        redirect_uri = url_for('oauth2callback', _external=True)
         config = get_client_secrets_config()
         if isinstance(config, dict):
-            flow = Flow.from_client_config(config, scopes=SCOPES)
-            flow.redirect_uri = url_for('oauth2callback', _external=True)
+            flow = Flow.from_client_config(config, scopes=SCOPES, redirect_uri=redirect_uri, code_verifier=code_verifier)
         else:
-            flow = Flow.from_client_secrets_file(config, scopes=SCOPES, redirect_uri=url_for('oauth2callback', _external=True))
+            flow = Flow.from_client_secrets_file(config, scopes=SCOPES, redirect_uri=redirect_uri, code_verifier=code_verifier)
         authorization_url, state = flow.authorization_url(access_type='offline', include_granted_scopes='true', prompt='consent')
         session['state'] = state
         return redirect(authorization_url)
@@ -443,7 +447,11 @@ def oauth2callback():
             print("ERROR: State missing from session")
             return jsonify({'error': 'Invalid session state'}), 400
         state = session['state']
-        
+        code_verifier = session.pop('code_verifier', None)
+        if not code_verifier:
+            print("ERROR: code_verifier missing from session (PKCE required across redirect)")
+            return jsonify({'error': 'Login failed. Please try again.'}), 500
+        redirect_uri = url_for('oauth2callback', _external=True)
         try:
             config = get_client_secrets_config()
             # #region agent log
@@ -454,10 +462,9 @@ def oauth2callback():
             return jsonify({'error': 'OAuth configuration not found. Please check GOOGLE_CLIENT_SECRETS_JSON environment variable or client_secrets.json file.'}), 500
         
         if isinstance(config, dict):
-            flow = Flow.from_client_config(config, scopes=SCOPES)
-            flow.redirect_uri = url_for('oauth2callback', _external=True)
+            flow = Flow.from_client_config(config, scopes=SCOPES, state=state, redirect_uri=redirect_uri, code_verifier=code_verifier)
         else:
-            flow = Flow.from_client_secrets_file(config, scopes=SCOPES, state=state, redirect_uri=url_for('oauth2callback', _external=True))
+            flow = Flow.from_client_secrets_file(config, scopes=SCOPES, state=state, redirect_uri=redirect_uri, code_verifier=code_verifier)
         # #region agent log
         _debug_log("main.py:oauth2callback:after_flow", "flow created", {"redirect_uri": flow.redirect_uri[:50] + "..." if flow.redirect_uri and len(flow.redirect_uri) > 50 else flow.redirect_uri}, "H2")
         # #endregion
