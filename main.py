@@ -7,6 +7,8 @@ import time
 import hashlib
 import uuid
 import random
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 import flask
 
@@ -72,12 +74,11 @@ if os.environ.get("FLASK_ENV") != "production":
 def handle_500_error(e):
     import traceback
     error_trace = traceback.format_exc()
-    path = request.path if request else "unknown"
-    print(f"[500] path={path} error={e}")
+    print(f"Unhandled 500 error: {e}")
     print(error_trace)
     # Don't expose raw upstream (Google/Gemini) errors to client
     safe_msg = "Something went wrong. Please try again or log in again."
-    return jsonify({'error': safe_msg, 'endpoint': path, 'details': error_trace[:500] if app.config.get('DEBUG') else None}), 500
+    return jsonify({'error': safe_msg, 'details': error_trace[:500] if app.config.get('DEBUG') else None}), 500
 
 SCOPES = [
     'https://www.googleapis.com/auth/userinfo.email',
@@ -90,7 +91,8 @@ SCOPES = [
 CLIENT_SECRETS_FILE = "client_secrets.json"
 SETTINGS_FILE = "user_settings.json"
 CACHE_FILE = "cache.json"
-CACHE_TTL_SECONDS = 900 
+CACHE_TTL_SECONDS = 900
+_cache_lock = threading.Lock()
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
@@ -324,6 +326,66 @@ def get_settings_hash(settings):
     s = json.dumps(settings, sort_keys=True)
     return hashlib.md5(s.encode()).hexdigest()
 
+def _fetch_one_message(args):
+    """Fetch a single Gmail message. Used by parallel workers. Returns (index, email_block, is_priority) or (index, None, None) on skip/error."""
+    index, message_id, creds_dict, keywords, priority_sources = args
+    try:
+        creds = Credentials(**creds_dict)
+        service = build('gmail', 'v1', credentials=creds)
+        msg = service.users().messages().get(userId='me', id=message_id, format='full').execute()
+        headers = msg['payload']['headers']
+        subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
+        sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'No Sender')
+        body_data = ""
+        if 'parts' in msg['payload']:
+            for part in msg['payload']['parts']:
+                if part['mimeType'] == 'text/html':
+                    body_data = part['body']['data']
+                    break
+        else:
+            body_data = msg['payload'].get('body', {}).get('data', '')
+        if not body_data:
+            return (index, None, None)
+        decoded_data = base64.urlsafe_b64decode(body_data.encode('ASCII'))
+        soup = BeautifulSoup(decoded_data, "lxml")
+        clean_text = soup.get_text(separator='\n', strip=True)
+        sanitized_text = sanitize_for_llm(clean_text)
+        if keywords:
+            has_keyword = any(k.lower() in sanitized_text.lower() or k.lower() in subject.lower() for k in keywords)
+            if not has_keyword:
+                return (index, None, None)
+        if len(sanitized_text) > 4000:
+            sanitized_text = sanitized_text[:4000] + "... [TRUNCATED]"
+        email_block = f"\n\n--- Newsletter from: {sender} ---\n--- Subject: {subject} ---\n{sanitized_text}\n"
+        is_priority = any(p.lower() in sender.lower() for p in priority_sources)
+        return (index, email_block, is_priority)
+    except Exception as e:
+        print(f"fetch_emails: failed to fetch message {message_id}: {e}")
+        return (index, None, None)
+
+def _synthesize_one_chunk(args):
+    """Synthesize a single TTS chunk. Used by parallel workers. Returns (index, audio_bytes)."""
+    index, chunk_text, creds_dict, style, project_id = args
+    byte_limit = 4800
+    if len(chunk_text.encode('utf-8')) > byte_limit:
+        chunk_text = chunk_text.encode('utf-8')[:byte_limit].decode('utf-8', 'ignore')
+    creds = Credentials(**creds_dict)
+    client_opts = client_options.ClientOptions(quota_project_id=project_id) if project_id else None
+    tts_client = texttospeech.TextToSpeechClient(credentials=creds, client_options=client_opts, transport="rest")
+    persona_config = PERSONAS.get(style, PERSONAS['anchor'])
+    voice = texttospeech.VoiceSelectionParams(language_code="en-US", name=persona_config['voice_name'], ssml_gender=persona_config['gender'])
+    audio_config = texttospeech.AudioConfig(
+        audio_encoding=texttospeech.AudioEncoding.MP3,
+        speaking_rate=persona_config.get('speaking_rate', 1.0),
+        pitch=persona_config.get('pitch', 0.0)
+    )
+    response = tts_client.synthesize_speech(
+        input=texttospeech.SynthesisInput(text=chunk_text),
+        voice=voice,
+        audio_config=audio_config
+    )
+    return (index, response.audio_content)
+
 # --- Routes ---
 
 @app.route('/')
@@ -393,15 +455,7 @@ def logout():
 
 @app.route('/api/check_auth')
 def check_auth():
-    # #region agent log
-    _log = {"sessionId":"4b162f","location":"main.py:check_auth","data":{"has_credentials":"credentials" in session}}
-    print(f"[DEBUG 4b162f] {json.dumps(_log)}", flush=True)
-    # #endregion
     user_info = get_user_info()
-    # #region agent log
-    _log2 = {"sessionId":"4b162f","location":"main.py:check_auth","message":"result","data":{"has_user_info":user_info is not None}}
-    print(f"[DEBUG 4b162f] {json.dumps(_log2)}", flush=True)
-    # #endregion
     return jsonify({'logged_in': True, 'user': user_info}) if user_info else jsonify({'logged_in': False})
 
 @app.route('/api/settings', methods=['GET'])
@@ -453,83 +507,56 @@ def fetch_emails():
     settings = load_settings(email)
     
     current_hash = get_settings_hash(settings)
-    cache = load_cache()
-    if (cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (cache.get('settings_hash') == current_hash) and (cache.get('analysis')):
-        return jsonify(cache['analysis'])
-    
+    with _cache_lock:
+        cache = load_cache()
+        if (cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (cache.get('settings_hash') == current_hash) and (cache.get('analysis')):
+            return jsonify(cache['analysis'])
+
     creds = Credentials(**session['credentials'])
+    creds_dict = dict(session['credentials'])
     try:
         service = build('gmail', 'v1', credentials=creds)
         sources = settings.get('sources', []) or ["wsj.com", "nytimes.com"]
         hours = settings.get('time_window_hours', 24)
-        
-        # --- NEW: Get Watchlist & Priority ---
         keywords = settings.get('keywords', [])
         priority_sources = settings.get('priority_sources', [])
-        
+
         sources_query = " OR ".join([f"from:{s}" for s in sources])
         query = f"({sources_query}) newer_than:{hours}h"
-        
-        # Increase maxResults to account for filtering
         results = service.users().messages().list(userId='me', q=query, maxResults=50).execute()
         messages = results.get('messages', [])
-        if not messages: return jsonify({'story_groups': [], 'remaining_stories': [{'headline': f'No newsletters found in last {hours}h.'}]})
-        
+        if not messages:
+            return jsonify({'story_groups': [], 'remaining_stories': [{'headline': f'No newsletters found in last {hours}h.'}]})
+
+        worker_args = [(i, msg['id'], creds_dict, keywords, priority_sources) for i, msg in enumerate(messages)]
         priority_text = ""
         normal_text = ""
-        
-        for message in messages:
-            msg = service.users().messages().get(userId='me', id=message['id'], format='full').execute()
-            headers = msg['payload']['headers']
-            subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
-            sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'No Sender')
-            
-            body_data = ""
-            if 'parts' in msg['payload']:
-                for part in msg['payload']['parts']:
-                    if part['mimeType'] == 'text/html': body_data = part['body']['data']; break
-            else: body_data = msg['payload'].get('body', {}).get('data', '')
-            if not body_data: continue
-            
-            decoded_data = base64.urlsafe_b64decode(body_data.encode('ASCII'))
-            soup = BeautifulSoup(decoded_data, "lxml")
-            clean_text = soup.get_text(separator='\n', strip=True)
-            sanitized_text = sanitize_for_llm(clean_text)
-            
-            # --- FEATURE: Watchlist Filtering ---
-            # If keywords are set, skip emails that don't match ANY keyword
-            if keywords:
-                has_keyword = any(k.lower() in sanitized_text.lower() or k.lower() in subject.lower() for k in keywords)
-                if not has_keyword:
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            for _index, email_block, is_priority in executor.map(_fetch_one_message, worker_args):
+                if email_block is None:
                     continue
+                if is_priority:
+                    priority_text += f"*** PRIORITY SOURCE ***\n{email_block}"
+                else:
+                    normal_text += email_block
 
-            if len(sanitized_text) > 4000: sanitized_text = sanitized_text[:4000] + "... [TRUNCATED]"
-            
-            email_block = f"\n\n--- Newsletter from: {sender} ---\n--- Subject: {subject} ---\n{sanitized_text}\n"
-            
-            # --- FEATURE: Source Prioritization ---
-            # If sender is in priority list, add to priority block
-            is_priority = any(p.lower() in sender.lower() for p in priority_sources)
-            if is_priority:
-                priority_text += f"*** PRIORITY SOURCE ***\n{email_block}"
-            else:
-                normal_text += email_block
-
-        # Put priority text FIRST so LLM sees it
         consolidated_text = priority_text + normal_text
-
-        if not consolidated_text: 
+        if not consolidated_text:
             reason = "No text found matching your watchlist." if keywords else "No text found."
             return jsonify({'story_groups': [], 'remaining_stories': [{'headline': reason}]})
-        
+
         analysis_result = analyze_news_with_llm(consolidated_text)
-        
-        cache['timestamp'] = time.time()
-        cache['settings_hash'] = current_hash
-        cache['analysis'] = analysis_result
-        if 'audio' in cache: del cache['audio']
-        if 'script_hash' in cache: del cache['script_hash']
-        save_cache(cache)
+
+        with _cache_lock:
+            cache = load_cache()
+            cache['timestamp'] = time.time()
+            cache['settings_hash'] = current_hash
+            cache['analysis'] = analysis_result
+            if 'audio' in cache:
+                del cache['audio']
+            if 'script_hash' in cache:
+                del cache['script_hash']
+            save_cache(cache)
         return jsonify(analysis_result)
     except Exception as e:
         err_msg = str(e).lower()
@@ -555,22 +582,23 @@ def generate_audio():
     creds = Credentials(**creds_data)
     try:
         auth_req = google.auth.transport.requests.Request()
-        if creds.expired: creds.refresh(auth_req); session['credentials']['token'] = creds.token; session.modified = True
+        if creds.expired:
+            creds.refresh(auth_req)
+            session['credentials']['token'] = creds.token
+            session.modified = True
     except Exception:
         pass
+    creds_dict = dict(session['credentials'])
     try:
-        client_opts = None
-        if PROJECT_ID: client_opts = client_options.ClientOptions(quota_project_id=PROJECT_ID)
-        tts_client = texttospeech.TextToSpeechClient(credentials=creds, client_options=client_opts, transport="rest")
-
         analysis_data = request.get_json()
         if not analysis_data:
             return jsonify({'error': 'No briefing data to convert to audio.'}), 400
         script_text = generate_script_from_analysis(analysis_data, style)
         script_hash = hashlib.md5((script_text + style).encode()).hexdigest()
-        cache = load_cache()
-        if cache.get('script_hash') == script_hash and cache.get('audio'):
-            return jsonify({"audio_content": cache['audio']})
+        with _cache_lock:
+            cache = load_cache()
+            if cache.get('script_hash') == script_hash and cache.get('audio'):
+                return jsonify({"audio_content": cache['audio']})
 
         sentences = re.split(r'(?<=[.!?])\s+', script_text)
         chunks = []
@@ -580,22 +608,22 @@ def generate_audio():
             if len(current_chunk.encode('utf-8')) + len(sentence.encode('utf-8')) + 1 < byte_limit:
                 current_chunk += sentence + " "
             else:
-                if current_chunk: chunks.append(current_chunk)
+                if current_chunk:
+                    chunks.append(current_chunk)
                 current_chunk = sentence + " "
-        if current_chunk: chunks.append(current_chunk)
+        if current_chunk:
+            chunks.append(current_chunk)
 
-        persona_config = PERSONAS.get(style, PERSONAS['anchor'])
-        voice = texttospeech.VoiceSelectionParams(language_code="en-US", name=persona_config['voice_name'], ssml_gender=persona_config['gender'])
-        audio_config = texttospeech.AudioConfig(audio_encoding=texttospeech.AudioEncoding.MP3, speaking_rate=persona_config.get('speaking_rate', 1.0), pitch=persona_config.get('pitch', 0.0))
-        all_audio_content = b""
-        for chunk_text in chunks:
-            if len(chunk_text.encode('utf-8')) > byte_limit: chunk_text = chunk_text.encode('utf-8')[:byte_limit].decode('utf-8', 'ignore')
-            response = tts_client.synthesize_speech(input=texttospeech.SynthesisInput(text=chunk_text), voice=voice, audio_config=audio_config)
-            all_audio_content += response.audio_content
+        worker_args = [(i, chunk_text, creds_dict, style, PROJECT_ID) for i, chunk_text in enumerate(chunks)]
+        with ThreadPoolExecutor(max_workers=min(len(chunks), 8)) as executor:
+            results = list(executor.map(_synthesize_one_chunk, worker_args))
+        all_audio_content = b"".join(audio for _idx, audio in results)
         audio_base64 = base64.b64encode(all_audio_content).decode('utf-8')
-        cache['script_hash'] = script_hash
-        cache['audio'] = audio_base64
-        save_cache(cache)
+        with _cache_lock:
+            cache = load_cache()
+            cache['script_hash'] = script_hash
+            cache['audio'] = audio_base64
+            save_cache(cache)
         return jsonify({"audio_content": audio_base64})
     except Exception as e:
         err_msg = str(e).lower()
