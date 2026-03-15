@@ -55,6 +55,7 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 CORS(app, supports_credentials=True)
 
 # --- Rate Limiting ---
+# Note: storage_uri="memory://" is per-process; with multiple gunicorn workers the limit is effectively (limit x workers) per user.
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
@@ -62,7 +63,10 @@ limiter = Limiter(
     storage_uri="memory://"
 )
 
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "default_secret_key_for_development")
+_secret_key = os.environ.get("FLASK_SECRET_KEY")
+if os.environ.get("FLASK_ENV") == "production" and not _secret_key:
+    raise RuntimeError("FLASK_SECRET_KEY must be set in production")
+app.secret_key = _secret_key or "default_secret_key_for_development"
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 # Enable detailed error messages in development
@@ -169,6 +173,8 @@ def get_user_info():
         return user_info_service.userinfo().get().execute()
     except Exception as ex:
         print(f"get_user_info error: {ex}")
+        session.pop('credentials', None)
+        session.pop('user_email', None)
         return None
 
 def load_settings(user_email=None):
@@ -190,7 +196,7 @@ def load_settings(user_email=None):
             conn.close()
             if row:
                 user_settings = defaults.copy()
-                user_settings.update(row['settings'])
+                user_settings.update(row['settings'] or {})
                 return user_settings
         except Exception:
             pass
@@ -238,10 +244,10 @@ PROJECT_ID = os.environ.get("GOOGLE_CLOUD_PROJECT")
 if not PROJECT_ID:
     try:
         config = get_client_secrets_config()
-        if isinstance(config, dict): secrets = config
+        if isinstance(config, dict): client_secrets = config
         else:
-            with open(config, 'r') as f: secrets = json.load(f)
-        data = secrets.get('web') or secrets.get('installed')
+            with open(config, 'r') as f: client_secrets = json.load(f)
+        data = client_secrets.get('web') or client_secrets.get('installed')
         if data: PROJECT_ID = data.get('project_id')
     except: pass
 
@@ -299,7 +305,10 @@ def analyze_news_with_llm(newsletters_text):
     try:
         generation_config = genai.types.GenerationConfig(max_output_tokens=8192, temperature=0.2)
         response = model.generate_content(prompt, generation_config=generation_config)
-        match = re.search(r'\{.*\}', response.text, re.DOTALL)
+        text = getattr(response, 'text', None)
+        if not text:
+            return {"error": "AI analysis failed."}
+        match = re.search(r'\{.*\}', text, re.DOTALL)
         if match: return json.loads(match.group(0))
         else: raise ValueError("No valid JSON found.")
     except json.JSONDecodeError:
@@ -309,6 +318,7 @@ def analyze_news_with_llm(newsletters_text):
         return {"error": "AI analysis failed."}
 
 # --- Caching Helpers ---
+# File-based cache is ephemeral on Render and not shared across workers; treat as best-effort.
 def load_cache():
     if not os.path.exists(CACHE_FILE): return {}
     try:
@@ -421,28 +431,9 @@ def login():
         print(error_trace)
         return jsonify({'error': f'Login failed: {str(e)}'}), 500
 
-# --- Debug logging for oauth2callback (session e0f0e5) ---
-def _debug_log(location, message, data=None, hypothesis_id=None):
-    payload = {"sessionId": "e0f0e5", "location": location, "message": message, "timestamp": int(time.time() * 1000)}
-    if data is not None:
-        payload["data"] = data
-    if hypothesis_id is not None:
-        payload["hypothesisId"] = hypothesis_id
-    line = json.dumps(payload)
-    try:
-        with open("debug-e0f0e5.log", "a") as _f:
-            _f.write(line + "\n")
-    except Exception:
-        pass
-    # So production (e.g. Render) logs show the same payload without file access
-    print(f"[DEBUG_OAUTH] {line}", flush=True)
-
 @app.route('/oauth2callback')
 def oauth2callback():
     try:
-        # #region agent log
-        _debug_log("main.py:oauth2callback:entry", "oauth2callback entered", {"has_state": "state" in session, "url_path": request.path}, "H5")
-        # #endregion
         if 'state' not in session:
             print("ERROR: State missing from session")
             return jsonify({'error': 'Invalid session state'}), 400
@@ -454,9 +445,6 @@ def oauth2callback():
         redirect_uri = url_for('oauth2callback', _external=True)
         try:
             config = get_client_secrets_config()
-            # #region agent log
-            _debug_log("main.py:oauth2callback:after_config", "config obtained", {"config_type": "dict" if isinstance(config, dict) else "file"}, "H1")
-            # #endregion
         except FileNotFoundError as config_err:
             print(f"ERROR: Client secrets not found: {config_err}")
             return jsonify({'error': 'OAuth configuration not found. Please check GOOGLE_CLIENT_SECRETS_JSON environment variable or client_secrets.json file.'}), 500
@@ -465,26 +453,14 @@ def oauth2callback():
             flow = Flow.from_client_config(config, scopes=SCOPES, state=state, redirect_uri=redirect_uri, code_verifier=code_verifier)
         else:
             flow = Flow.from_client_secrets_file(config, scopes=SCOPES, state=state, redirect_uri=redirect_uri, code_verifier=code_verifier)
-        # #region agent log
-        _debug_log("main.py:oauth2callback:after_flow", "flow created", {"redirect_uri": flow.redirect_uri[:50] + "..." if flow.redirect_uri and len(flow.redirect_uri) > 50 else flow.redirect_uri}, "H2")
-        # #endregion
 
         flow.fetch_token(authorization_response=request.url)
-        # #region agent log
-        _debug_log("main.py:oauth2callback:after_fetch_token", "fetch_token ok", {}, "H3")
-        # #endregion
         credentials = flow.credentials
-        
+
         session['credentials'] = {'token': credentials.token, 'refresh_token': credentials.refresh_token, 'token_uri': credentials.token_uri, 'client_id': credentials.client_id, 'client_secret': credentials.client_secret, 'scopes': credentials.scopes}
-        # #region agent log
-        _debug_log("main.py:oauth2callback:after_session", "session credentials stored", {}, "H4")
-        # #endregion
         return redirect("/")
     except Exception as e:
         import traceback
-        # #region agent log
-        _debug_log("main.py:oauth2callback:exception", "oauth2callback exception", {"exc_type": type(e).__name__, "exc_msg": str(e)[:500]}, "H1-H4")
-        # #endregion
         print(f"OAuth callback error: {e}")
         print(traceback.format_exc())
         return jsonify({'error': 'Login failed. Please try again.'}), 500
@@ -515,9 +491,12 @@ def get_settings():
 def update_settings():
     if 'credentials' not in session: 
         return jsonify({'error': 'Please log in to save your settings.'}), 401
+    new_settings = request.get_json()
+    if not isinstance(new_settings, dict):
+        return jsonify({'error': 'Invalid request.'}), 400
     user_info = get_user_info()
     email = user_info.get('email') if user_info else None
-    if save_settings(request.get_json(), email):
+    if save_settings(new_settings, email):
         return jsonify({'status': 'success'})
     return jsonify({'error': 'Unable to save settings. Please try again or contact support if the issue persists.'}), 500
 
@@ -587,6 +566,8 @@ def fetch_emails():
             return jsonify({'story_groups': [], 'remaining_stories': [{'headline': reason}]})
 
         analysis_result = analyze_news_with_llm(consolidated_text)
+        if analysis_result.get('error'):
+            return jsonify(analysis_result), 503
 
         with _cache_lock:
             cache = load_cache()
