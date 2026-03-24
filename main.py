@@ -403,7 +403,8 @@ def _synthesize_one_chunk(args):
 def index():
     return render_template('index.html',
         sentry_dsn_frontend=os.environ.get('SENTRY_DSN_FRONTEND', ''),
-        posthog_api_key=os.environ.get('POSTHOG_API_KEY', '')
+        posthog_api_key=os.environ.get('POSTHOG_API_KEY', ''),
+        react_production=not app.debug,
     )
 
 @app.route('/login')
