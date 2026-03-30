@@ -52,7 +52,14 @@ else:
 # --- Configuration & Constants ---
 app = flask.Flask(__name__, static_folder='.', static_url_path='')
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
-CORS(app, supports_credentials=True)
+
+allowed_origins = os.environ.get("ALLOWED_ORIGINS")
+if allowed_origins:
+    origins_list = [origin.strip() for origin in allowed_origins.split(",") if origin.strip()]
+    CORS(app, supports_credentials=True, origins=origins_list)
+else:
+    CORS(app)
+
 
 # --- Rate Limiting ---
 # Note: storage_uri="memory://" is per-process; with multiple gunicorn workers the limit is effectively (limit x workers) per user.
