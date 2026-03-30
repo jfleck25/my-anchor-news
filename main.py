@@ -164,11 +164,36 @@ init_db()
 
 # --- Helper Functions ---
 
+
+def get_credentials_from_session(creds_data):
+    if not creds_data:
+        return None
+    try:
+        config = get_client_secrets_config()
+        if isinstance(config, dict):
+            client_secrets = config
+        else:
+            with open(config, 'r') as f:
+                import json
+                client_secrets = json.load(f)
+        data = client_secrets.get('web') or client_secrets.get('installed')
+        client_secret = data.get('client_secret')
+
+        creds_kwargs = dict(creds_data)
+        if client_secret:
+            creds_kwargs['client_secret'] = client_secret
+
+        return Credentials(**creds_kwargs)
+    except Exception as e:
+        print(f"Error loading client secret: {e}")
+        return Credentials(**creds_data)
+
 def get_user_info():
+
     if 'credentials' not in session:
         return None
     try:
-        credentials = Credentials(**session['credentials'])
+        credentials = get_credentials_from_session(session['credentials'])
         user_info_service = build('oauth2', 'v2', credentials=credentials)
         return user_info_service.userinfo().get().execute()
     except Exception as ex:
@@ -341,7 +366,7 @@ def _fetch_one_message(args):
     """Fetch a single Gmail message. Used by parallel workers. Returns (index, email_block, is_priority) or (index, None, None) on skip/error."""
     index, message_id, creds_dict, keywords, priority_sources = args
     try:
-        creds = Credentials(**creds_dict)
+        creds = get_credentials_from_session(creds_dict)
         service = build('gmail', 'v1', credentials=creds)
         msg = service.users().messages().get(userId='me', id=message_id, format='full').execute()
         headers = msg['payload']['headers']
@@ -380,7 +405,7 @@ def _synthesize_one_chunk(args):
     byte_limit = 4800
     if len(chunk_text.encode('utf-8')) > byte_limit:
         chunk_text = chunk_text.encode('utf-8')[:byte_limit].decode('utf-8', 'ignore')
-    creds = Credentials(**creds_dict)
+    creds = get_credentials_from_session(creds_dict)
     client_opts = client_options.ClientOptions(quota_project_id=project_id) if project_id else None
     tts_client = texttospeech.TextToSpeechClient(credentials=creds, client_options=client_opts, transport="rest")
     persona_config = PERSONAS.get(style, PERSONAS['anchor'])
@@ -457,7 +482,7 @@ def oauth2callback():
         flow.fetch_token(authorization_response=request.url)
         credentials = flow.credentials
 
-        session['credentials'] = {'token': credentials.token, 'refresh_token': credentials.refresh_token, 'token_uri': credentials.token_uri, 'client_id': credentials.client_id, 'client_secret': credentials.client_secret, 'scopes': credentials.scopes}
+        session['credentials'] = {'token': credentials.token, 'refresh_token': credentials.refresh_token, 'token_uri': credentials.token_uri, 'client_id': credentials.client_id, 'scopes': credentials.scopes}
         return redirect("/")
     except Exception as e:
         import traceback
@@ -532,7 +557,7 @@ def fetch_emails():
         if (cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (cache.get('settings_hash') == current_hash) and (cache.get('analysis')):
             return jsonify(cache['analysis'])
 
-    creds = Credentials(**session['credentials'])
+    creds = get_credentials_from_session(session['credentials'])
     creds_dict = dict(session['credentials'])
     try:
         service = build('gmail', 'v1', credentials=creds)
@@ -601,7 +626,7 @@ def generate_audio():
     style = settings.get('personality', 'anchor')
     
     creds_data = session['credentials']
-    creds = Credentials(**creds_data)
+    creds = get_credentials_from_session(creds_data)
     try:
         auth_req = google.auth.transport.requests.Request()
         if creds.expired:
