@@ -1,0 +1,56 @@
+import sys
+import os
+import unittest
+from unittest.mock import MagicMock, patch
+import importlib
+
+MOCKED_MODULES = [
+    'flask', 'flask_cors', 'google_auth_oauthlib', 'google_auth_oauthlib.flow',
+    'google', 'google.oauth2', 'google.oauth2.credentials', 'googleapiclient',
+    'googleapiclient.discovery', 'google.generativeai', 'google.cloud',
+    'google.api_core', 'bs4', 'google.auth', 'google.auth.transport',
+    'google.auth.transport.requests', 'werkzeug', 'werkzeug.middleware',
+    'werkzeug.middleware.proxy_fix', 'psycopg2', 'psycopg2.extras',
+    'flask_limiter', 'flask_limiter.util', 'sentry_sdk',
+    'sentry_sdk.integrations', 'sentry_sdk.integrations.flask', 'dotenv'
+]
+
+class TestGetSharedBriefing(unittest.TestCase):
+    def setUp(self):
+        self.mocks = {mod: MagicMock() for mod in MOCKED_MODULES}
+
+        self.mock_flask = self.mocks['flask']
+        self.mock_app = MagicMock()
+        self.mock_flask.Flask.return_value = self.mock_app
+
+        def mock_route(*args, **kwargs):
+            def decorator(f):
+                return f
+            return decorator
+        self.mock_app.route = mock_route
+
+        self.patcher = patch.dict('sys.modules', self.mocks)
+        self.patcher.start()
+
+        import main
+        importlib.reload(main)
+        self.main_module = main
+
+        self.main_module.DATABASE_URL = "postgres://dummy"
+        self.mock_flask.jsonify.reset_mock()
+        self.mock_flask.jsonify.side_effect = lambda x: x
+
+    def tearDown(self):
+        self.patcher.stop()
+
+    def test_get_shared_briefing_exception(self):
+        with patch.object(self.main_module.psycopg2, 'connect') as mock_connect:
+            mock_connect.side_effect = Exception("Database connection failed")
+
+            result = self.main_module.get_shared_briefing("test_id")
+
+            self.assertEqual(result, ({'error': 'Unable to load shared briefing. Please try again.'}, 500))
+            self.mock_flask.jsonify.assert_called_once_with({'error': 'Unable to load shared briefing. Please try again.'})
+
+if __name__ == '__main__':
+    unittest.main()
