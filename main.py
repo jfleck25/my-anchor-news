@@ -27,6 +27,7 @@ from bs4 import BeautifulSoup
 import google.auth.transport.requests 
 from werkzeug.middleware.proxy_fix import ProxyFix
 import psycopg2 
+from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -133,30 +134,56 @@ PERSONAS = {
 }
 
 # --- Database Setup ---
+db_pool = None
+
+def get_db_connection():
+    global db_pool
+    if db_pool:
+        return db_pool.getconn()
+    if DATABASE_URL:
+        return psycopg2.connect(DATABASE_URL)
+    return None
+
+def release_db_connection(conn):
+    global db_pool
+    if conn:
+        try:
+            conn.rollback() # Ensure connection state is clean
+        except Exception:
+            pass
+        if db_pool:
+            db_pool.putconn(conn)
+        else:
+            conn.close()
+
 def init_db():
+    global db_pool
     if not DATABASE_URL: 
         print(" * Running in Local Mode (No Database URL found)")
         return
     try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS user_settings (
-                user_email VARCHAR(255) PRIMARY KEY,
-                settings JSONB
-            );
-        """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS shared_briefings (
-                share_id UUID PRIMARY KEY,
-                data JSONB,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
-        conn.commit()
-        cur.close()
-        conn.close()
-        print(" * Database connection successful.")
+        db_pool = psycopg2.pool.ThreadedConnectionPool(1, 20, DATABASE_URL)
+        conn = get_db_connection()
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_settings (
+                    user_email VARCHAR(255) PRIMARY KEY,
+                    settings JSONB
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS shared_briefings (
+                    share_id UUID PRIMARY KEY,
+                    data JSONB,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            conn.commit()
+            cur.close()
+            print(" * Database connection successful.")
+        finally:
+            release_db_connection(conn)
     except Exception as e:
         print(f" * DB Init Error: {e}")
 
@@ -188,12 +215,14 @@ def load_settings(user_email=None):
     
     if DATABASE_URL and user_email:
         try:
-            conn = psycopg2.connect(DATABASE_URL)
-            cur = conn.cursor(cursor_factory=RealDictCursor)
-            cur.execute("SELECT settings FROM user_settings WHERE user_email = %s", (user_email,))
-            row = cur.fetchone()
-            cur.close()
-            conn.close()
+            conn = get_db_connection()
+            try:
+                cur = conn.cursor(cursor_factory=RealDictCursor)
+                cur.execute("SELECT settings FROM user_settings WHERE user_email = %s", (user_email,))
+                row = cur.fetchone()
+                cur.close()
+            finally:
+                release_db_connection(conn)
             if row:
                 user_settings = defaults.copy()
                 user_settings.update(row['settings'] or {})
@@ -212,15 +241,17 @@ def load_settings(user_email=None):
 def save_settings(new_settings, user_email=None):
     if DATABASE_URL and user_email:
         try:
-            conn = psycopg2.connect(DATABASE_URL)
-            cur = conn.cursor()
-            cur.execute("""
-                INSERT INTO user_settings (user_email, settings) VALUES (%s, %s)
-                ON CONFLICT (user_email) DO UPDATE SET settings = EXCLUDED.settings;
-            """, (user_email, json.dumps(new_settings)))
-            conn.commit()
-            cur.close()
-            conn.close()
+            conn = get_db_connection()
+            try:
+                cur = conn.cursor()
+                cur.execute("""
+                    INSERT INTO user_settings (user_email, settings) VALUES (%s, %s)
+                    ON CONFLICT (user_email) DO UPDATE SET settings = EXCLUDED.settings;
+                """, (user_email, json.dumps(new_settings)))
+                conn.commit()
+                cur.close()
+            finally:
+                release_db_connection(conn)
             return True
         except Exception:
             return False
@@ -665,10 +696,13 @@ def share_briefing():
     share_id = str(uuid.uuid4())
     if DATABASE_URL:
         try:
-            conn = psycopg2.connect(DATABASE_URL)
-            cur = conn.cursor()
-            cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(data)))
-            conn.commit(); cur.close(); conn.close()
+            conn = get_db_connection()
+            try:
+                cur = conn.cursor()
+                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(data)))
+                conn.commit(); cur.close()
+            finally:
+                release_db_connection(conn)
             return jsonify({'share_id': share_id})
         except Exception:
             return jsonify({'error': 'Unable to save shared briefing. Please try again.'}), 500
@@ -678,10 +712,13 @@ def share_briefing():
 def get_shared_briefing(share_id):
     if DATABASE_URL:
         try:
-            conn = psycopg2.connect(DATABASE_URL)
-            cur = conn.cursor(cursor_factory=RealDictCursor)
-            cur.execute("SELECT data FROM shared_briefings WHERE share_id = %s", (share_id,))
-            row = cur.fetchone(); cur.close(); conn.close()
+            conn = get_db_connection()
+            try:
+                cur = conn.cursor(cursor_factory=RealDictCursor)
+                cur.execute("SELECT data FROM shared_briefings WHERE share_id = %s", (share_id,))
+                row = cur.fetchone(); cur.close()
+            finally:
+                release_db_connection(conn)
             if row: return jsonify(row['data'])
             return jsonify({'error': 'This shared briefing could not be found. The link may be invalid or expired.'}), 404
         except Exception:
