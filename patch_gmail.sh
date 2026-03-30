@@ -1,0 +1,16 @@
+cat << 'PATCH' > gmail.patch
+--- main.py
++++ main.py
+@@ -341,8 +341,11 @@
+     index, message_id, creds_dict, keywords, priority_sources = args
+     try:
+-        creds = Credentials(**creds_dict)
+-        service = build('gmail', 'v1', credentials=creds)
++        if not hasattr(_worker_thread_locals, 'gmail_service'):
++            creds = Credentials(**creds_dict)
++            _worker_thread_locals.gmail_service = build('gmail', 'v1', credentials=creds)
++        service = _worker_thread_locals.gmail_service
+         msg = service.users().messages().get(userId='me', id=message_id, format='full').execute()
+         headers = msg['payload']['headers']
+PATCH
+patch main.py < gmail.patch
