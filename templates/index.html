@@ -801,15 +801,9 @@
                     });
             };
 
-            const handleDownloadPDF = () => {
-                if (!analysis) return;
-                const formattedText = generateFormattedSummary();
-                
-                // Create a printable HTML version
-                const printWindow = window.open('', '_blank');
-                const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-                
-                printWindow.document.write(`
+
+            const generatePDFHtml = (analysis, today) => {
+                let html = `
                     <!DOCTYPE html>
                     <html>
                     <head>
@@ -954,52 +948,52 @@
                             <div class="subtitle">Your AI News Analyst</div>
                             <div class="date">${today}</div>
                         </div>
-                `);
+                `;
                 
                 // Top Stories
                 if (analysis.story_groups && analysis.story_groups.length > 0) {
-                    printWindow.document.write('<h2 class="section-title">📰 Top Stories</h2>');
+                    html += '<h2 class="section-title">📰 Top Stories</h2>';
                     
                     analysis.story_groups.forEach((group, index) => {
-                        printWindow.document.write(`
+                        html += `
                             <div class="story">
                                 <div class="story-headline">
                                     <span class="story-number">${index + 1}</span>
                                     ${group.group_headline}
                                 </div>
                                 <div class="story-summary">${group.group_summary}</div>
-                        `);
+                        `;
                         
                         if (group.stories && group.stories.length > 0) {
-                            printWindow.document.write('<div class="perspectives">');
-                            printWindow.document.write('<div class="perspectives-title">Source Perspectives</div>');
+                            html += '<div class="perspectives">';
+                            html += '<div class="perspectives-title">Source Perspectives</div>';
                             group.stories.forEach(story => {
                                 const source = story.source.split('<')[0].trim().replace('.com', '');
-                                printWindow.document.write(`
+                                html += `
                                     <div class="perspective">
                                         <span class="source">${source}:</span> ${story.angle}
                                     </div>
-                                `);
+                                `;
                             });
-                            printWindow.document.write('</div>');
+                            html += '</div>';
                         }
                         
-                        printWindow.document.write('</div>');
+                        html += '</div>';
                     });
                 }
                 
                 // In Brief
                 if (analysis.remaining_stories && analysis.remaining_stories.length > 0) {
-                    printWindow.document.write('<h2 class="section-title">📌 In Brief</h2>');
-                    printWindow.document.write('<div class="brief-items">');
+                    html += '<h2 class="section-title">📌 In Brief</h2>';
+                    html += '<div class="brief-items">';
                     analysis.remaining_stories.forEach(story => {
-                        printWindow.document.write(`<div class="brief-item">${story.headline}</div>`);
+                        html += `<div class="brief-item">${story.headline}</div>`;
                     });
-                    printWindow.document.write('</div>');
+                    html += '</div>';
                 }
                 
                 // Footer
-                printWindow.document.write(`
+                html += `
                         <div class="footer">
                             <div class="logo">MY ANCHOR</div>
                             <div>Generated on ${new Date().toLocaleString('en-US')}</div>
@@ -1007,7 +1001,19 @@
                         </div>
                     </body>
                     </html>
-                `);
+                `;
+
+                return html;
+            };
+
+            const handleDownloadPDF = () => {
+                if (!analysis) return;
+
+                // Create a printable HTML version
+                const printWindow = window.open('', '_blank');
+                const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+                printWindow.document.write(generatePDFHtml(analysis, today));
                 
                 printWindow.document.close();
                 
