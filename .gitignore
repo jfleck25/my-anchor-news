@@ -41,3 +41,6 @@ my-anchor-voice-model-research.md
 
 # IDE / editor
 .cursor/
+
+# Node
+node_modules/

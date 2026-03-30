@@ -1162,22 +1162,24 @@
                                                 </div>
                                                 <h3 className="text-2xl md:text-3xl font-serif font-bold text-slate-900 dark:text-white mb-4 leading-tight">{group.group_headline}</h3>
                                                 <p className="text-slate-600 dark:text-slate-300 text-lg leading-relaxed mb-8">{group.group_summary}</p>
-                                                <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-5 border border-slate-100 dark:border-slate-800">
-                                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">Source Perspectives</h4>
-                                                    <div className="space-y-4">
-                                                        {group.stories.map((story, i) => (
-                                                            <div key={i} className="flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-4">
-                                                                <span className="shrink-0 text-sm font-bold text-blue-700 dark:text-blue-300 px-2 py-1.5 bg-blue-50 dark:bg-blue-900/30 rounded-full border border-blue-100 dark:border-blue-800 shadow-sm max-w-[180px] sm:max-w-none truncate inline-flex items-center gap-1.5">
-                                                                {getSourceDomain(story.source) && (
-                                                                    <img src={`https://www.google.com/s2/favicons?domain=${getSourceDomain(story.source)}&sz=32`} alt="" className="w-4 h-4 shrink-0 rounded-sm" />
-                                                                )}
-                                                                {story.source.split('<')[0].trim().replace(/\.(com|co\.\w+)$/, '') || story.source}
-                                                            </span>
-                                                                <p className="text-slate-600 dark:text-slate-400 italic text-sm leading-relaxed border-l-2 border-indigo-200 dark:border-indigo-800 pl-3">"{story.angle}"</p>
-                                                            </div>
-                                                        ))}
+                                                {group.stories && group.stories.length > 0 && (
+                                                    <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-5 border border-slate-100 dark:border-slate-800">
+                                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">Source Perspectives</h4>
+                                                        <div className="space-y-4">
+                                                            {group.stories.map((story, i) => (
+                                                                <div key={i} className="flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-4">
+                                                                    <span className="shrink-0 text-sm font-bold text-blue-700 dark:text-blue-300 px-2 py-1.5 bg-blue-50 dark:bg-blue-900/30 rounded-full border border-blue-100 dark:border-blue-800 shadow-sm max-w-[180px] sm:max-w-none truncate inline-flex items-center gap-1.5">
+                                                                        {getSourceDomain(story.source) && (
+                                                                            <img src={`https://www.google.com/s2/favicons?domain=${getSourceDomain(story.source)}&sz=32`} alt="" className="w-4 h-4 shrink-0 rounded-sm" />
+                                                                        )}
+                                                                        {story.source.split('<')[0].trim().replace(/\.(com|co\.\w+)$/, '') || story.source}
+                                                                    </span>
+                                                                    <p className="text-slate-600 dark:text-slate-400 italic text-sm leading-relaxed border-l-2 border-indigo-200 dark:border-indigo-800 pl-3">"{story.angle}"</p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </div>
-                                                </div>
+                                                )}
                                             </div>
                                         </div>
                                     ))}
