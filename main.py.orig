@@ -22,12 +22,11 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 import google.generativeai as genai
 from google.cloud import texttospeech
-from google.api_core import client_options 
+from google.api_core import client_options
 from bs4 import BeautifulSoup
-import google.auth.transport.requests 
+import google.auth.transport.requests
 from werkzeug.middleware.proxy_fix import ProxyFix
-import psycopg2 
-from psycopg2 import pool
+import psycopg2
 from psycopg2.extras import RealDictCursor
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -53,14 +52,7 @@ else:
 # --- Configuration & Constants ---
 app = flask.Flask(__name__, static_folder='.', static_url_path='')
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
-
-allowed_origins = os.environ.get("ALLOWED_ORIGINS")
-if allowed_origins:
-    origins_list = [origin.strip() for origin in allowed_origins.split(",") if origin.strip()]
-    CORS(app, supports_credentials=True, origins=origins_list)
-else:
-    CORS(app)
-
+CORS(app, supports_credentials=True)
 
 # --- Rate Limiting ---
 # Note: storage_uri="memory://" is per-process; with multiple gunicorn workers the limit is effectively (limit x workers) per user.
@@ -142,56 +134,30 @@ PERSONAS = {
 }
 
 # --- Database Setup ---
-db_pool = None
-
-def get_db_connection():
-    global db_pool
-    if db_pool:
-        return db_pool.getconn()
-    if DATABASE_URL:
-        return psycopg2.connect(DATABASE_URL)
-    return None
-
-def release_db_connection(conn):
-    global db_pool
-    if conn:
-        try:
-            conn.rollback() # Ensure connection state is clean
-        except Exception:
-            pass
-        if db_pool:
-            db_pool.putconn(conn)
-        else:
-            conn.close()
-
 def init_db():
-    global db_pool
-    if not DATABASE_URL: 
+    if not DATABASE_URL:
         print(" * Running in Local Mode (No Database URL found)")
         return
     try:
-        db_pool = psycopg2.pool.ThreadedConnectionPool(1, 20, DATABASE_URL)
-        conn = get_db_connection()
-        try:
-            cur = conn.cursor()
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS user_settings (
-                    user_email VARCHAR(255) PRIMARY KEY,
-                    settings JSONB
-                );
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS shared_briefings (
-                    share_id UUID PRIMARY KEY,
-                    data JSONB,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                );
-            """)
-            conn.commit()
-            cur.close()
-            print(" * Database connection successful.")
-        finally:
-            release_db_connection(conn)
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS user_settings (
+                user_email VARCHAR(255) PRIMARY KEY,
+                settings JSONB
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS shared_briefings (
+                share_id UUID PRIMARY KEY,
+                data JSONB,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        conn.commit()
+        cur.close()
+        conn.close()
+        print(" * Database connection successful.")
     except Exception as e:
         print(f" * DB Init Error: {e}")
 
@@ -199,47 +165,17 @@ init_db()
 
 # --- Helper Functions ---
 
-
-def get_credentials_from_session(creds_data):
-    if not creds_data:
-        return None
-    try:
-        config = get_client_secrets_config()
-        if isinstance(config, dict):
-            client_secrets = config
-        else:
-            with open(config, 'r') as f:
-                import json
-                client_secrets = json.load(f)
-        data = client_secrets.get('web') or client_secrets.get('installed')
-        client_secret = data.get('client_secret')
-
-        creds_kwargs = dict(creds_data)
-        if client_secret:
-            creds_kwargs['client_secret'] = client_secret
-
-        return Credentials(**creds_kwargs)
-    except Exception as e:
-        print(f"Error loading client secret: {e}")
-        return Credentials(**creds_data)
-
 def get_user_info():
-
     if 'credentials' not in session:
         return None
-    if 'user_info' in session:
-        return session['user_info']
     try:
-        credentials = get_credentials_from_session(session['credentials'])
+        credentials = Credentials(**session['credentials'])
         user_info_service = build('oauth2', 'v2', credentials=credentials)
-        user_info = user_info_service.userinfo().get().execute()
-        session['user_info'] = user_info
-        return user_info
+        return user_info_service.userinfo().get().execute()
     except Exception as ex:
         print(f"get_user_info error: {ex}")
         session.pop('credentials', None)
         session.pop('user_email', None)
-        session.pop('user_info', None)
         return None
 
 def load_settings(user_email=None):
@@ -250,17 +186,15 @@ def load_settings(user_email=None):
         "priority_sources": [],
         "keywords": []
     }
-    
+
     if DATABASE_URL and user_email:
         try:
-            conn = get_db_connection()
-            try:
-                cur = conn.cursor(cursor_factory=RealDictCursor)
-                cur.execute("SELECT settings FROM user_settings WHERE user_email = %s", (user_email,))
-                row = cur.fetchone()
-                cur.close()
-            finally:
-                release_db_connection(conn)
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute("SELECT settings FROM user_settings WHERE user_email = %s", (user_email,))
+            row = cur.fetchone()
+            cur.close()
+            conn.close()
             if row:
                 user_settings = defaults.copy()
                 user_settings.update(row['settings'] or {})
@@ -279,28 +213,24 @@ def load_settings(user_email=None):
 def save_settings(new_settings, user_email=None):
     if DATABASE_URL and user_email:
         try:
-            conn = get_db_connection()
-            try:
-                cur = conn.cursor()
-                cur.execute("""
-                    INSERT INTO user_settings (user_email, settings) VALUES (%s, %s)
-                    ON CONFLICT (user_email) DO UPDATE SET settings = EXCLUDED.settings;
-                """, (user_email, json.dumps(new_settings)))
-                conn.commit()
-                cur.close()
-            finally:
-                release_db_connection(conn)
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO user_settings (user_email, settings) VALUES (%s, %s)
+                ON CONFLICT (user_email) DO UPDATE SET settings = EXCLUDED.settings;
+            """, (user_email, json.dumps(new_settings)))
+            conn.commit()
+            cur.close()
+            conn.close()
             return True
-        except Exception as e:
-            print(f"Error saving settings to DB: {e}")
+        except Exception:
             return False
-            
+
     try:
         with open(SETTINGS_FILE, 'w') as f:
             json.dump(new_settings, f, indent=2)
         return True
-    except Exception as e:
-        print(f"Error saving settings to file: {e}")
+    except Exception:
         return False
 
 def get_client_secrets_config():
@@ -336,25 +266,25 @@ def sanitize_for_llm(text):
 
 def generate_script_from_analysis(analysis_json, style="anchor"):
     persona = PERSONAS.get(style, PERSONAS["anchor"])
-    script_parts = [f"{random.choice(persona['intro'])} "]
-    
+    script = f"{random.choice(persona['intro'])} "
+
     story_groups = analysis_json.get('story_groups', [])
     for i, group in enumerate(story_groups):
-        script_parts.append(f"{group.get('group_headline', '')}. {group.get('group_summary', '')}. ")
+        script += f"{group.get('group_headline', '')}. {group.get('group_summary', '')}. "
         stories = group.get('stories', [])
         if len(stories) > 1:
-            script_parts.append("Perspectives: ")
+            script += "Perspectives: "
             for story in stories:
                 source = story.get('source', 'One source').split('<')[0].strip().replace('.com', '')
-                script_parts.append(f"The {source} {story.get('angle', '')}. ")
-        if i < len(story_groups) - 1: script_parts.append(f" {random.choice(persona['transition'])} ")
-            
+                script += f"The {source} {story.get('angle', '')}. "
+        if i < len(story_groups) - 1: script += f" {random.choice(persona['transition'])} "
+
     remaining = analysis_json.get('remaining_stories', [])
     if remaining:
-        script_parts.append("Briefly: ")
-        for story in remaining: script_parts.append(f"{story.get('headline', '')}. ")
-    script_parts.append(f" {persona['outro']}")
-    return "".join(script_parts)
+        script += "Briefly: "
+        for story in remaining: script += f"{story.get('headline', '')}. "
+    script += f" {persona['outro']}"
+    return script
 
 def analyze_news_with_llm(newsletters_text):
     if not model: raise Exception("Gemini API model is not configured.")
@@ -368,9 +298,9 @@ def analyze_news_with_llm(newsletters_text):
     5. **Remaining Stories**: Top 5 only. One-sentence summary.
     6. **Filter**: Ignore ads/fluff.
     7. **Limit**: Top 10 groups max.
-    
+
     Output JSON: { "story_groups": [ { "group_headline": "...", "group_summary": "...", "stories": [ { "headline": "...", "source": "...", "angle": "..." } ] } ], "remaining_stories": [ { "headline": "..." } ] }
-    
+
     Content: ---
     """ + newsletters_text
     try:
@@ -399,7 +329,7 @@ def load_cache():
         return {}
 
 def save_cache(data):
-    try: 
+    try:
         with open(CACHE_FILE, 'w') as f: json.dump(data, f)
     except Exception as e:
         pass
@@ -412,10 +342,8 @@ def _fetch_one_message(args):
     """Fetch a single Gmail message. Used by parallel workers. Returns (index, email_block, is_priority) or (index, None, None) on skip/error."""
     index, message_id, creds_dict, keywords, priority_sources = args
     try:
-        if not hasattr(_worker_thread_locals, 'gmail_service'):
-            creds = get_credentials_from_session(creds_dict)
-            _worker_thread_locals.gmail_service = build('gmail', 'v1', credentials=creds)
-        service = _worker_thread_locals.gmail_service
+        creds = Credentials(**creds_dict)
+        service = build('gmail', 'v1', credentials=creds)
         msg = service.users().messages().get(userId='me', id=message_id, format='full').execute()
         headers = msg['payload']['headers']
         subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
@@ -453,12 +381,9 @@ def _synthesize_one_chunk(args):
     byte_limit = 4800
     if len(chunk_text.encode('utf-8')) > byte_limit:
         chunk_text = chunk_text.encode('utf-8')[:byte_limit].decode('utf-8', 'ignore')
-
-    if not hasattr(_worker_thread_locals, 'tts_client'):
-        creds = get_credentials_from_session(creds_dict)
-        client_opts = client_options.ClientOptions(quota_project_id=project_id) if project_id else None
-        _worker_thread_locals.tts_client = texttospeech.TextToSpeechClient(credentials=creds, client_options=client_opts, transport="rest")
-    tts_client = _worker_thread_locals.tts_client
+    creds = Credentials(**creds_dict)
+    client_opts = client_options.ClientOptions(quota_project_id=project_id) if project_id else None
+    tts_client = texttospeech.TextToSpeechClient(credentials=creds, client_options=client_opts, transport="rest")
     persona_config = PERSONAS.get(style, PERSONAS['anchor'])
     voice = texttospeech.VoiceSelectionParams(language_code="en-US", name=persona_config['voice_name'], ssml_gender=persona_config['gender'])
     audio_config = texttospeech.AudioConfig(
@@ -479,8 +404,7 @@ def _synthesize_one_chunk(args):
 def index():
     return render_template('index.html',
         sentry_dsn_frontend=os.environ.get('SENTRY_DSN_FRONTEND', ''),
-        posthog_api_key=os.environ.get('POSTHOG_API_KEY', ''),
-        react_production=not app.debug,
+        posthog_api_key=os.environ.get('POSTHOG_API_KEY', '')
     )
 
 @app.route('/login')
@@ -525,7 +449,7 @@ def oauth2callback():
         except FileNotFoundError as config_err:
             print(f"ERROR: Client secrets not found: {config_err}")
             return jsonify({'error': 'OAuth configuration not found. Please check GOOGLE_CLIENT_SECRETS_JSON environment variable or client_secrets.json file.'}), 500
-        
+
         if isinstance(config, dict):
             flow = Flow.from_client_config(config, scopes=SCOPES, state=state, redirect_uri=redirect_uri, code_verifier=code_verifier)
         else:
@@ -534,7 +458,7 @@ def oauth2callback():
         flow.fetch_token(authorization_response=request.url)
         credentials = flow.credentials
 
-        session['credentials'] = {'token': credentials.token, 'refresh_token': credentials.refresh_token, 'token_uri': credentials.token_uri, 'client_id': credentials.client_id, 'scopes': credentials.scopes}
+        session['credentials'] = {'token': credentials.token, 'refresh_token': credentials.refresh_token, 'token_uri': credentials.token_uri, 'client_id': credentials.client_id, 'client_secret': credentials.client_secret, 'scopes': credentials.scopes}
         return redirect("/")
     except Exception as e:
         import traceback
@@ -566,7 +490,7 @@ def get_settings():
 
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
-    if 'credentials' not in session: 
+    if 'credentials' not in session:
         return jsonify({'error': 'Please log in to save your settings.'}), 401
     new_settings = request.get_json()
     if not isinstance(new_settings, dict):
@@ -594,22 +518,22 @@ def get_user_email_for_rate_limit():
 @app.route('/api/fetch_emails')
 @limiter.limit("3 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit of 3 briefings. Upgrade to Pro for unlimited briefings or try again tomorrow!")
 def fetch_emails():
-    if 'credentials' not in session: 
+    if 'credentials' not in session:
         return jsonify({'error': 'Please log in to generate your briefing.'}), 401
-    
+
     user_info = get_user_info()
     email = user_info.get('email') if user_info else None
     # Store email in session for rate limiting
     if email: session['user_email'] = email
     settings = load_settings(email)
-    
+
     current_hash = get_settings_hash(settings)
     with _cache_lock:
         cache = load_cache()
         if (cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (cache.get('settings_hash') == current_hash) and (cache.get('analysis')):
             return jsonify(cache['analysis'])
 
-    creds = get_credentials_from_session(session['credentials'])
+    creds = Credentials(**session['credentials'])
     creds_dict = dict(session['credentials'])
     try:
         service = build('gmail', 'v1', credentials=creds)
@@ -668,17 +592,17 @@ def fetch_emails():
 
 @app.route('/api/generate_audio', methods=['POST'])
 def generate_audio():
-    if 'credentials' not in session: 
+    if 'credentials' not in session:
         return jsonify({'error': 'Please log in to generate audio.'}), 401
-    
+
     # --- Load Settings to get Persona ---
     user_info = get_user_info()
     email = user_info.get('email') if user_info else None
     settings = load_settings(email)
     style = settings.get('personality', 'anchor')
-    
+
     creds_data = session['credentials']
-    creds = get_credentials_from_session(creds_data)
+    creds = Credentials(**creds_data)
     try:
         auth_req = google.auth.transport.requests.Request()
         if creds.expired:
@@ -742,13 +666,10 @@ def share_briefing():
     share_id = str(uuid.uuid4())
     if DATABASE_URL:
         try:
-            conn = get_db_connection()
-            try:
-                cur = conn.cursor()
-                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(data)))
-                conn.commit(); cur.close()
-            finally:
-                release_db_connection(conn)
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(data)))
+            conn.commit(); cur.close(); conn.close()
             return jsonify({'share_id': share_id})
         except Exception:
             return jsonify({'error': 'Unable to save shared briefing. Please try again.'}), 500
@@ -758,13 +679,10 @@ def share_briefing():
 def get_shared_briefing(share_id):
     if DATABASE_URL:
         try:
-            conn = get_db_connection()
-            try:
-                cur = conn.cursor(cursor_factory=RealDictCursor)
-                cur.execute("SELECT data FROM shared_briefings WHERE share_id = %s", (share_id,))
-                row = cur.fetchone(); cur.close()
-            finally:
-                release_db_connection(conn)
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor(cursor_factory=RealDictCursor)
+            cur.execute("SELECT data FROM shared_briefings WHERE share_id = %s", (share_id,))
+            row = cur.fetchone(); cur.close(); conn.close()
             if row: return jsonify(row['data'])
             return jsonify({'error': 'This shared briefing could not be found. The link may be invalid or expired.'}), 404
         except Exception:

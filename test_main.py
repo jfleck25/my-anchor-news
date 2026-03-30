@@ -46,3 +46,22 @@ def test_index_route(client):
     # Depending on exact implementation it might be a redirect (302) or 200.
     # At minimum, asserting we get a response object without blowing up.
     assert response.status_code in [200, 302, 401]
+import unittest
+from unittest.mock import MagicMock, patch
+import sys
+import threading
+
+sys.modules['google.cloud'] = MagicMock()
+sys.modules['google.cloud.texttospeech'] = MagicMock()
+sys.modules['googleapiclient.discovery'] = MagicMock()
+sys.modules['google.oauth2.credentials'] = MagicMock()
+
+import main
+
+class TestOptimization(unittest.TestCase):
+    def test_worker_thread_locals(self):
+        self.assertTrue(hasattr(main, '_worker_thread_locals'))
+        self.assertIsInstance(main._worker_thread_locals, type(threading.local()))
+
+if __name__ == '__main__':
+    unittest.main()
