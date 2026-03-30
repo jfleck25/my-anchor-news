@@ -22,11 +22,11 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 import google.generativeai as genai
 from google.cloud import texttospeech
-from google.api_core import client_options 
+from google.api_core import client_options
 from bs4 import BeautifulSoup
-import google.auth.transport.requests 
+import google.auth.transport.requests
 from werkzeug.middleware.proxy_fix import ProxyFix
-import psycopg2 
+import psycopg2
 from psycopg2.extras import RealDictCursor
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -135,7 +135,7 @@ PERSONAS = {
 
 # --- Database Setup ---
 def init_db():
-    if not DATABASE_URL: 
+    if not DATABASE_URL:
         print(" * Running in Local Mode (No Database URL found)")
         return
     try:
@@ -186,7 +186,7 @@ def load_settings(user_email=None):
         "priority_sources": [],
         "keywords": []
     }
-    
+
     if DATABASE_URL and user_email:
         try:
             conn = psycopg2.connect(DATABASE_URL)
@@ -225,7 +225,7 @@ def save_settings(new_settings, user_email=None):
             return True
         except Exception:
             return False
-            
+
     try:
         with open(SETTINGS_FILE, 'w') as f:
             json.dump(new_settings, f, indent=2)
@@ -267,7 +267,7 @@ def sanitize_for_llm(text):
 def generate_script_from_analysis(analysis_json, style="anchor"):
     persona = PERSONAS.get(style, PERSONAS["anchor"])
     script = f"{random.choice(persona['intro'])} "
-    
+
     story_groups = analysis_json.get('story_groups', [])
     for i, group in enumerate(story_groups):
         script += f"{group.get('group_headline', '')}. {group.get('group_summary', '')}. "
@@ -278,7 +278,7 @@ def generate_script_from_analysis(analysis_json, style="anchor"):
                 source = story.get('source', 'One source').split('<')[0].strip().replace('.com', '')
                 script += f"The {source} {story.get('angle', '')}. "
         if i < len(story_groups) - 1: script += f" {random.choice(persona['transition'])} "
-            
+
     remaining = analysis_json.get('remaining_stories', [])
     if remaining:
         script += "Briefly: "
@@ -298,9 +298,9 @@ def analyze_news_with_llm(newsletters_text):
     5. **Remaining Stories**: Top 5 only. One-sentence summary.
     6. **Filter**: Ignore ads/fluff.
     7. **Limit**: Top 10 groups max.
-    
+
     Output JSON: { "story_groups": [ { "group_headline": "...", "group_summary": "...", "stories": [ { "headline": "...", "source": "...", "angle": "..." } ] } ], "remaining_stories": [ { "headline": "..." } ] }
-    
+
     Content: ---
     """ + newsletters_text
     try:
@@ -329,7 +329,7 @@ def load_cache():
         return {}
 
 def save_cache(data):
-    try: 
+    try:
         with open(CACHE_FILE, 'w') as f: json.dump(data, f)
     except Exception as e:
         pass
@@ -342,10 +342,8 @@ def _fetch_one_message(args):
     """Fetch a single Gmail message. Used by parallel workers. Returns (index, email_block, is_priority) or (index, None, None) on skip/error."""
     index, message_id, creds_dict, keywords, priority_sources = args
     try:
-        if not hasattr(_worker_thread_locals, 'gmail_service'):
-            creds = Credentials(**creds_dict)
-            _worker_thread_locals.gmail_service = build('gmail', 'v1', credentials=creds)
-        service = _worker_thread_locals.gmail_service
+        creds = Credentials(**creds_dict)
+        service = build('gmail', 'v1', credentials=creds)
         msg = service.users().messages().get(userId='me', id=message_id, format='full').execute()
         headers = msg['payload']['headers']
         subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
@@ -383,12 +381,9 @@ def _synthesize_one_chunk(args):
     byte_limit = 4800
     if len(chunk_text.encode('utf-8')) > byte_limit:
         chunk_text = chunk_text.encode('utf-8')[:byte_limit].decode('utf-8', 'ignore')
-
-    if not hasattr(_worker_thread_locals, 'tts_client'):
-        creds = Credentials(**creds_dict)
-        client_opts = client_options.ClientOptions(quota_project_id=project_id) if project_id else None
-        _worker_thread_locals.tts_client = texttospeech.TextToSpeechClient(credentials=creds, client_options=client_opts, transport="rest")
-    tts_client = _worker_thread_locals.tts_client
+    creds = Credentials(**creds_dict)
+    client_opts = client_options.ClientOptions(quota_project_id=project_id) if project_id else None
+    tts_client = texttospeech.TextToSpeechClient(credentials=creds, client_options=client_opts, transport="rest")
     persona_config = PERSONAS.get(style, PERSONAS['anchor'])
     voice = texttospeech.VoiceSelectionParams(language_code="en-US", name=persona_config['voice_name'], ssml_gender=persona_config['gender'])
     audio_config = texttospeech.AudioConfig(
@@ -454,7 +449,7 @@ def oauth2callback():
         except FileNotFoundError as config_err:
             print(f"ERROR: Client secrets not found: {config_err}")
             return jsonify({'error': 'OAuth configuration not found. Please check GOOGLE_CLIENT_SECRETS_JSON environment variable or client_secrets.json file.'}), 500
-        
+
         if isinstance(config, dict):
             flow = Flow.from_client_config(config, scopes=SCOPES, state=state, redirect_uri=redirect_uri, code_verifier=code_verifier)
         else:
@@ -495,7 +490,7 @@ def get_settings():
 
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
-    if 'credentials' not in session: 
+    if 'credentials' not in session:
         return jsonify({'error': 'Please log in to save your settings.'}), 401
     new_settings = request.get_json()
     if not isinstance(new_settings, dict):
@@ -523,15 +518,15 @@ def get_user_email_for_rate_limit():
 @app.route('/api/fetch_emails')
 @limiter.limit("3 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit of 3 briefings. Upgrade to Pro for unlimited briefings or try again tomorrow!")
 def fetch_emails():
-    if 'credentials' not in session: 
+    if 'credentials' not in session:
         return jsonify({'error': 'Please log in to generate your briefing.'}), 401
-    
+
     user_info = get_user_info()
     email = user_info.get('email') if user_info else None
     # Store email in session for rate limiting
     if email: session['user_email'] = email
     settings = load_settings(email)
-    
+
     current_hash = get_settings_hash(settings)
     with _cache_lock:
         cache = load_cache()
@@ -597,15 +592,15 @@ def fetch_emails():
 
 @app.route('/api/generate_audio', methods=['POST'])
 def generate_audio():
-    if 'credentials' not in session: 
+    if 'credentials' not in session:
         return jsonify({'error': 'Please log in to generate audio.'}), 401
-    
+
     # --- Load Settings to get Persona ---
     user_info = get_user_info()
     email = user_info.get('email') if user_info else None
     settings = load_settings(email)
     style = settings.get('personality', 'anchor')
-    
+
     creds_data = session['credentials']
     creds = Credentials(**creds_data)
     try:
