@@ -537,8 +537,12 @@ def fetch_emails():
         if (cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (cache.get('settings_hash') == current_hash) and (cache.get('analysis')):
             return jsonify(cache['analysis'])
 
-    creds = Credentials(**session['credentials'])
-    creds_dict = dict(session['credentials'])
+    creds_data = session.get('credentials')
+    if not creds_data:
+        return jsonify({'error': 'Your session expired. Please log in again.'}), 401
+
+    creds = Credentials(**creds_data)
+    creds_dict = dict(creds_data)
     try:
         service = build('gmail', 'v1', credentials=creds)
         sources = settings.get('sources', []) or ["wsj.com", "nytimes.com"]
@@ -608,17 +612,21 @@ def generate_audio():
     settings = load_settings(email)
     style = settings.get('personality', 'anchor')
 
-    creds_data = session['credentials']
+    creds_data = session.get('credentials')
+    if not creds_data:
+        return jsonify({'error': 'Your session expired. Please log in again.'}), 401
     creds = Credentials(**creds_data)
     try:
         auth_req = google.auth.transport.requests.Request()
         if creds.expired:
             creds.refresh(auth_req)
-            session['credentials']['token'] = creds.token
-            session.modified = True
+            session_creds = session.get('credentials')
+            if session_creds is not None:
+                session_creds['token'] = creds.token
+                session.modified = True
     except Exception:
         pass
-    creds_dict = dict(session['credentials'])
+    creds_dict = dict(creds_data)
     try:
         analysis_data = request.get_json()
         if not analysis_data:
