@@ -167,14 +167,19 @@ init_db()
 def get_user_info():
     if 'credentials' not in session:
         return None
+    if 'user_info' in session:
+        return session['user_info']
     try:
         credentials = Credentials(**session['credentials'])
         user_info_service = build('oauth2', 'v2', credentials=credentials)
-        return user_info_service.userinfo().get().execute()
+        user_info = user_info_service.userinfo().get().execute()
+        session['user_info'] = user_info
+        return user_info
     except Exception as ex:
         print(f"get_user_info error: {ex}")
         session.pop('credentials', None)
         session.pop('user_email', None)
+        session.pop('user_info', None)
         return None
 
 def load_settings(user_email=None):
