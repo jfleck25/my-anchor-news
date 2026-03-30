@@ -522,11 +522,15 @@ def fetch_emails():
         return jsonify({'error': 'Please log in to generate your briefing.'}), 401
     
     user_info = get_user_info()
+    # get_user_info() may pop credentials if the token is invalid/expired
+    if 'credentials' not in session:
+        return jsonify({'error': 'Your session expired. Please log in again.'}), 401
+
     email = user_info.get('email') if user_info else None
     # Store email in session for rate limiting
     if email: session['user_email'] = email
     settings = load_settings(email)
-    
+
     current_hash = get_settings_hash(settings)
     with _cache_lock:
         cache = load_cache()
@@ -597,10 +601,13 @@ def generate_audio():
     
     # --- Load Settings to get Persona ---
     user_info = get_user_info()
+    if 'credentials' not in session:
+        return jsonify({'error': 'Your session expired. Please log in again.'}), 401
+
     email = user_info.get('email') if user_info else None
     settings = load_settings(email)
     style = settings.get('personality', 'anchor')
-    
+
     creds_data = session['credentials']
     creds = Credentials(**creds_data)
     try:
