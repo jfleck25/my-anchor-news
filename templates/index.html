@@ -112,7 +112,7 @@
     <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/babel">
-    {% raw %}
+    /* {% raw %} */
         // --- Configuration ---
         const backendUrl = "";
         const ph = (fn, ...args) => { try { if (window.posthog && typeof window.posthog[fn] === 'function') return window.posthog[fn](...args); } catch(e) {} };
@@ -1355,7 +1355,7 @@
                 </ErrorBoundary>
             );
         }
-    {% endraw %}
+    /* {% endraw %} */
     </script>
 </body>
 </html>
