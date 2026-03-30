@@ -329,25 +329,25 @@ def sanitize_for_llm(text):
 
 def generate_script_from_analysis(analysis_json, style="anchor"):
     persona = PERSONAS.get(style, PERSONAS["anchor"])
-    script = f"{random.choice(persona['intro'])} "
+    script_parts = [f"{random.choice(persona['intro'])} "]
     
     story_groups = analysis_json.get('story_groups', [])
     for i, group in enumerate(story_groups):
-        script += f"{group.get('group_headline', '')}. {group.get('group_summary', '')}. "
+        script_parts.append(f"{group.get('group_headline', '')}. {group.get('group_summary', '')}. ")
         stories = group.get('stories', [])
         if len(stories) > 1:
-            script += "Perspectives: "
+            script_parts.append("Perspectives: ")
             for story in stories:
                 source = story.get('source', 'One source').split('<')[0].strip().replace('.com', '')
-                script += f"The {source} {story.get('angle', '')}. "
-        if i < len(story_groups) - 1: script += f" {random.choice(persona['transition'])} "
+                script_parts.append(f"The {source} {story.get('angle', '')}. ")
+        if i < len(story_groups) - 1: script_parts.append(f" {random.choice(persona['transition'])} ")
             
     remaining = analysis_json.get('remaining_stories', [])
     if remaining:
-        script += "Briefly: "
-        for story in remaining: script += f"{story.get('headline', '')}. "
-    script += f" {persona['outro']}"
-    return script
+        script_parts.append("Briefly: ")
+        for story in remaining: script_parts.append(f"{story.get('headline', '')}. ")
+    script_parts.append(f" {persona['outro']}")
+    return "".join(script_parts)
 
 def analyze_news_with_llm(newsletters_text):
     if not model: raise Exception("Gemini API model is not configured.")
