@@ -222,14 +222,16 @@ def save_settings(new_settings, user_email=None):
             cur.close()
             conn.close()
             return True
-        except Exception:
+        except Exception as e:
+            print(f"Error saving settings to DB: {e}")
             return False
             
     try:
         with open(SETTINGS_FILE, 'w') as f:
             json.dump(new_settings, f, indent=2)
         return True
-    except Exception:
+    except Exception as e:
+        print(f"Error saving settings to file: {e}")
         return False
 
 def get_client_secrets_config():
