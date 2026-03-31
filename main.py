@@ -51,7 +51,7 @@ else:
     print(" * Sentry DSN not found - error tracking disabled (set SENTRY_DSN environment variable)")
 
 # --- Configuration & Constants ---
-app = flask.Flask(__name__, static_folder='.', static_url_path='')
+app = flask.Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
 allowed_origins = os.environ.get("ALLOWED_ORIGINS")
@@ -75,12 +75,17 @@ _secret_key = os.environ.get("FLASK_SECRET_KEY")
 if os.environ.get("FLASK_ENV") == "production" and not _secret_key:
     raise RuntimeError("FLASK_SECRET_KEY must be set in production")
 app.secret_key = _secret_key or "default_secret_key_for_development"
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 # Enable detailed error messages in development
 if os.environ.get("FLASK_ENV") != "production":
+    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
     app.config['DEBUG'] = True
     app.config['PROPAGATE_EXCEPTIONS'] = True
+else:
+    # Security enhancements for production
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # Global error handler to catch all unhandled exceptions
 @app.errorhandler(500)
@@ -446,11 +451,20 @@ def _fetch_one_message(args):
         optimized_text = optimize_newsletter_for_llm(html_str, max_chars=15000)
         sanitized_text = sanitize_for_llm(optimized_text)
         if keywords:
-            has_keyword = any(k.lower() in sanitized_text.lower() or k.lower() in subject.lower() for k in keywords)
+            sanitized_text_lower = sanitized_text.lower()
+            subject_lower = subject.lower()
+            has_keyword = any(k in sanitized_text_lower or k in subject_lower for k in keywords)
             if not has_keyword:
                 return (index, None, None)
         email_block = f"\n\n--- Newsletter from: {sender} ---\n--- Subject: {subject} ---\n{sanitized_text}\n"
-        is_priority = any(p.lower() in sender.lower() for p in priority_sources)
+
+        # ⚡ Bolt: optimize string operations for priority sources
+        if priority_sources:
+            sender_lower = sender.lower()
+            is_priority = any(p in sender_lower for p in priority_sources)
+        else:
+            is_priority = False
+
         return (index, email_block, is_priority)
     except Exception as e:
         print(f"fetch_emails: failed to fetch message {message_id}: {e}")
@@ -632,8 +646,10 @@ def fetch_emails():
         service = build('gmail', 'v1', credentials=creds)
         sources = settings.get('sources', []) or ["wsj.com", "nytimes.com"]
         hours = settings.get('time_window_hours', 24)
-        keywords = settings.get('keywords', [])
-        priority_sources = settings.get('priority_sources', [])
+
+        # ⚡ Bolt: Pre-calculate lowercased keywords and sources to prevent lowercasing per message in worker loop
+        keywords = [k.lower() for k in settings.get('keywords', [])]
+        priority_sources = [p.lower() for p in settings.get('priority_sources', [])]
 
         sources_query = " OR ".join([f"from:{s}" for s in sources])
         query = f"({sources_query}) newer_than:{hours}h"

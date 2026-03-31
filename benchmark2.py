@@ -1,37 +1,21 @@
 import time
-from unittest.mock import MagicMock, patch
-import threading
-from google.oauth2.credentials import Credentials
-from google.cloud import texttospeech
-from google.api_core import client_options
+import random
+import string
 
-def benchmark_instantiation():
-    args = (
-        0,
-        "Hello world, this is a test chunk to measure the time it takes to create the TTS client. " * 10,
-        {
-            "token": "fake_token",
-            "refresh_token": "fake_refresh",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "client_id": "fake_client_id",
-            "client_secret": "fake_secret",
-            "scopes": ["https://www.googleapis.com/auth/cloud-platform"]
-        },
-        "anchor",
-        "fake-project-id"
-    )
+text = "".join(random.choices(string.ascii_letters, k=50000))
+subject = "Daily Newsletter"
+keywords = ["apple", "banana", "cherry", "date", "elderberry", "fig", "grape", "honeydew", "kiwi", "lemon", "xyz"]
 
-    creds = Credentials(**args[2])
-    client_opts = client_options.ClientOptions(quota_project_id=args[4])
+start = time.time()
+for _ in range(1000):
+    has_keyword = any(k.lower() in text.lower() or k.lower() in subject.lower() for k in keywords)
+end = time.time()
+print(f"Unoptimized: {end - start:.4f} seconds")
 
-    start = time.time()
-    for _ in range(500):
-        client = texttospeech.TextToSpeechClient(
-            credentials=creds,
-            client_options=client_opts,
-            transport="rest"
-        )
-    end = time.time()
-    print(f"500 instantiations took {end - start:.4f} seconds")
-
-benchmark_instantiation()
+start = time.time()
+for _ in range(1000):
+    text_lower = text.lower()
+    subject_lower = subject.lower()
+    has_keyword = any(k.lower() in text_lower or k.lower() in subject_lower for k in keywords)
+end = time.time()
+print(f"Optimized: {end - start:.4f} seconds")
