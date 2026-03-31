@@ -334,6 +334,17 @@ def sanitize_for_llm(text):
     text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
     return text.replace('\\', '\\\\').replace('"', '\\"')
 
+def optimize_newsletter_for_llm(html_content: str, max_chars: int = 15000) -> str:
+    """Strips HTML tags and extra whitespace to massively reduce LLM token usage."""
+    # REVIEW UPDATE: We use BeautifulSoup instead of simple regex to ensure we don't 
+    # extract the inner text of <script> and <style> tags, saving more tokens.
+    soup = BeautifulSoup(html_content, "lxml")
+    text_only = soup.get_text(separator=' ', strip=True)
+    # Remove extra whitespace (newline, tabs)
+    clean_text = ' '.join(text_only.split())
+    # Truncate to save tokens if it's too long
+    return clean_text[:max_chars]
+
 def generate_script_from_analysis(analysis_json, style="anchor"):
     persona = PERSONAS.get(style, PERSONAS["anchor"])
     script_parts = [f"{random.choice(persona['intro'])} "]
@@ -431,15 +442,13 @@ def _fetch_one_message(args):
         if not body_data:
             return (index, None, None)
         decoded_data = base64.urlsafe_b64decode(body_data.encode('ASCII'))
-        soup = BeautifulSoup(decoded_data, "lxml")
-        clean_text = soup.get_text(separator='\n', strip=True)
-        sanitized_text = sanitize_for_llm(clean_text)
+        html_str = decoded_data.decode('utf-8', errors='ignore')
+        optimized_text = optimize_newsletter_for_llm(html_str, max_chars=15000)
+        sanitized_text = sanitize_for_llm(optimized_text)
         if keywords:
             has_keyword = any(k.lower() in sanitized_text.lower() or k.lower() in subject.lower() for k in keywords)
             if not has_keyword:
                 return (index, None, None)
-        if len(sanitized_text) > 4000:
-            sanitized_text = sanitized_text[:4000] + "... [TRUNCATED]"
         email_block = f"\n\n--- Newsletter from: {sender} ---\n--- Subject: {subject} ---\n{sanitized_text}\n"
         is_priority = any(p.lower() in sender.lower() for p in priority_sources)
         return (index, email_block, is_priority)
