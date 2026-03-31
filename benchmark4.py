@@ -1,50 +1,26 @@
 import time
-from unittest.mock import MagicMock, patch
-import threading
-from concurrent.futures import ThreadPoolExecutor
-from google.oauth2.credentials import Credentials
-from google.cloud import texttospeech
-from google.api_core import client_options
+import random
+import string
 
-def synthesize_mock_worker(i, creds_dict, project_id):
-    creds = Credentials(**creds_dict)
-    client_opts = client_options.ClientOptions(quota_project_id=project_id) if project_id else None
-    tts_client = texttospeech.TextToSpeechClient(credentials=creds, client_options=client_opts, transport="rest")
-    return i
+text = "".join(random.choices(string.ascii_letters, k=100000))
+subject = "Daily Newsletter from NYT"
+keywords = ["apple", "banana", "cherry", "date", "elderberry", "fig", "grape", "honeydew", "kiwi", "lemon", "xyz"]
+sender = "NYT Newsletter"
+priority_sources = ["WSJ", "NYT", "Washington Post", "The Guardian", "xyz"]
 
-_worker_locals = threading.local()
+start = time.time()
+for _ in range(100):
+    if keywords:
+        has_keyword = any(k.lower() in text.lower() or k.lower() in subject.lower() for k in keywords)
+end = time.time()
+print(f"Unoptimized: {end - start:.4f} seconds")
 
-def synthesize_mock_worker_optimized(i, creds_dict, project_id):
-    if not hasattr(_worker_locals, 'tts_client'):
-        creds = Credentials(**creds_dict)
-        client_opts = client_options.ClientOptions(quota_project_id=project_id) if project_id else None
-        _worker_locals.tts_client = texttospeech.TextToSpeechClient(credentials=creds, client_options=client_opts, transport="rest")
-
-    tts_client = _worker_locals.tts_client
-    return i
-
-def run_benchmarks():
-    creds_dict = {
-        "token": "fake_token",
-        "refresh_token": "fake_refresh",
-        "token_uri": "https://oauth2.googleapis.com/token",
-        "client_id": "fake_client_id",
-        "client_secret": "fake_secret",
-        "scopes": ["https://www.googleapis.com/auth/cloud-platform"]
-    }
-    project_id = "fake-project-id"
-    chunks = 1000
-
-    start = time.time()
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        list(executor.map(lambda i: synthesize_mock_worker(i, creds_dict, project_id), range(chunks)))
-    unoptimized_time = time.time() - start
-    print(f"Unoptimized time (1000 tasks, 8 workers): {unoptimized_time:.4f} seconds")
-
-    start = time.time()
-    with ThreadPoolExecutor(max_workers=8) as executor:
-        list(executor.map(lambda i: synthesize_mock_worker_optimized(i, creds_dict, project_id), range(chunks)))
-    optimized_time = time.time() - start
-    print(f"Optimized time (1000 tasks, 8 workers): {optimized_time:.4f} seconds")
-
-run_benchmarks()
+start = time.time()
+keywords_lower = [k.lower() for k in keywords]
+for _ in range(100):
+    if keywords_lower:
+        text_lower = text.lower()
+        subject_lower = subject.lower()
+        has_keyword = any(k in text_lower or k in subject_lower for k in keywords_lower)
+end = time.time()
+print(f"Optimized: {end - start:.4f} seconds")
