@@ -75,12 +75,17 @@ _secret_key = os.environ.get("FLASK_SECRET_KEY")
 if os.environ.get("FLASK_ENV") == "production" and not _secret_key:
     raise RuntimeError("FLASK_SECRET_KEY must be set in production")
 app.secret_key = _secret_key or "default_secret_key_for_development"
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 # Enable detailed error messages in development
 if os.environ.get("FLASK_ENV") != "production":
+    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
     app.config['DEBUG'] = True
     app.config['PROPAGATE_EXCEPTIONS'] = True
+else:
+    # Security enhancements for production
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # Global error handler to catch all unhandled exceptions
 @app.errorhandler(500)
