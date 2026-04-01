@@ -1116,7 +1116,7 @@
                                     </button>
                                     {!sharedData && (
                                         <>
-                                            <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-500 hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors" title="Settings" aria-label="Open settings">
+                                            <button onClick={() => setIsSettingsOpen(true)} className="p-2 text-slate-500 hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" title="Settings (S)" aria-label="Open settings">
                                                 <Icons.Settings />
                                             </button>
                                             <div className="h-6 w-px bg-slate-200 dark:border-white/10 mx-2"></div>
@@ -1156,27 +1156,27 @@
                                 </div>
                                 <div className="flex flex-wrap gap-3 justify-center sm:justify-end">
                                     {analysis && (
-                                        <button onClick={handleCopySummary} className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all relative" title="Copy Executive Summary" aria-label={copySuccess ? "Copied to clipboard" : "Copy Executive Summary"}>
+                                        <button onClick={handleCopySummary} className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" title="Copy Executive Summary" aria-label={copySuccess ? "Copied to clipboard" : "Copy Executive Summary"}>
                                             {copySuccess ? <Icons.Check /> : <Icons.Copy />}
                                             {copySuccess && <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs py-1 px-2 rounded opacity-100 transition-opacity whitespace-nowrap">Copied!</span>}
                                         </button>
                                     )}
                                     {analysis && (
-                                        <button onClick={handleDownloadPDF} className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all relative" title="Download as PDF" aria-label="Download as PDF">
+                                        <button onClick={handleDownloadPDF} className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" title="Download as PDF" aria-label="Download as PDF">
                                             <Icons.Download />
                                         </button>
                                     )}
                                     {analysis && (
-                                        <button onClick={handleShare} className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all relative" title="Share Briefing Link" aria-label={shareUrl ? "Link copied to clipboard" : "Share Briefing Link"}>
+                                        <button onClick={handleShare} className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" title="Share Briefing Link" aria-label={shareUrl ? "Link copied to clipboard" : "Share Briefing Link"}>
                                             {shareUrl ? <Icons.Check /> : <Icons.Share />}
                                         </button>
                                     )}
-                                    <button onClick={handleFetchAndAnalyze} disabled={isFetching || isGeneratingAudio} className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white font-medium rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 focus:outline-none disabled:opacity-50 transition-all shadow-sm" title="Refresh briefing" aria-label={isFetching ? "Scanning inbox" : "Refresh briefing"}>
+                                    <button onClick={handleFetchAndAnalyze} disabled={isFetching || isGeneratingAudio} className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white font-medium rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 transition-all shadow-sm" title="Refresh briefing (R)" aria-label={isFetching ? "Scanning inbox" : "Refresh briefing"}>
                                         <Icons.Refresh />
                                         {isFetching ? 'Scanning...' : 'Refresh'}
                                     </button>
                                     {analysis && (
-                                        <button onClick={handleGenerateAudio} disabled={isGeneratingAudio || isFetching} className="flex items-center gap-2 px-6 py-3 bg-brand-500 text-white font-bold rounded-xl hover:bg-brand-600 hover:scale-105 active:scale-95 focus:outline-none disabled:opacity-50 shadow-lg shadow-brand-500/30 transition-all transform" title="Play briefing audio" aria-label={isPreloadingAudio ? "Preparing audio" : isGeneratingAudio ? "Synthesizing audio" : "Play briefing audio"}>
+                                        <button onClick={handleGenerateAudio} disabled={isGeneratingAudio || isFetching} className="flex items-center gap-2 px-6 py-3 bg-brand-500 text-white font-bold rounded-xl hover:bg-brand-600 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 shadow-lg shadow-brand-500/30 transition-all transform" title="Play briefing audio (P)" aria-label={isPreloadingAudio ? "Preparing audio" : isGeneratingAudio ? "Synthesizing audio" : "Play briefing audio"}>
                                             {isPreloadingAudio ? 'Preparing audio...' : isGeneratingAudio ? 'Synthesizing...' : <><Icons.Play /> Play Briefing</>}
                                         </button>
                                     )}
