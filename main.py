@@ -87,6 +87,14 @@ if os.environ.get("FLASK_ENV") == "production" and not _secret_key:
     raise RuntimeError("FLASK_SECRET_KEY must be set in production")
 app.secret_key = _secret_key or "default_secret_key_for_development"
 
+# Add security headers
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
+
 # Enable detailed error messages in development
 if os.environ.get("FLASK_ENV") != "production":
     os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
