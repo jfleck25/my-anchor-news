@@ -23,7 +23,6 @@ from googleapiclient.discovery import build
 import google.generativeai as genai
 from google.cloud import texttospeech
 from google.api_core import client_options 
-from bs4 import BeautifulSoup
 import google.auth.transport.requests 
 from werkzeug.middleware.proxy_fix import ProxyFix
 import psycopg2 
@@ -352,10 +351,11 @@ def sanitize_for_llm(text):
 
 def optimize_newsletter_for_llm(html_content: str, max_chars: int = 15000) -> str:
     """Strips HTML tags and extra whitespace to massively reduce LLM token usage."""
-    # REVIEW UPDATE: We use BeautifulSoup instead of simple regex to ensure we don't 
-    # extract the inner text of <script> and <style> tags, saving more tokens.
-    soup = BeautifulSoup(html_content, "lxml")
-    text_only = soup.get_text(separator=' ', strip=True)
+    # ⚡ Bolt: Use regex instead of BeautifulSoup for much faster parsing in worker threads.
+    # First, strip <script> and <style> blocks entirely.
+    html_content = re.sub(r'<(script|style)[^>]*>.*?</\1>', ' ', html_content, flags=re.IGNORECASE | re.DOTALL)
+    # Next, remove all remaining HTML tags.
+    text_only = re.sub(r'<[^>]+>', ' ', html_content)
     # Remove extra whitespace (newline, tabs)
     clean_text = ' '.join(text_only.split())
     # Truncate to save tokens if it's too long
