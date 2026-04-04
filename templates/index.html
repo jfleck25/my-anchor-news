@@ -152,6 +152,15 @@
     <script type="text/babel">
     /* {% raw %} */
         // --- Configuration ---
+        const escapeHtml = (unsafe) => {
+            if (!unsafe) return "";
+            return unsafe.toString()
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        };
         const backendUrl = "";
         const ph = (fn, ...args) => { try { if (window.posthog && typeof window.posthog[fn] === 'function') return window.posthog[fn](...args); } catch(e) {} };
         const getSourceDomain = (source) => {
@@ -1003,9 +1012,9 @@
                             <div class="story">
                                 <div class="story-headline">
                                     <span class="story-number">${index + 1}</span>
-                                    ${group.group_headline}
+                                    ${escapeHtml(group.group_headline)}
                                 </div>
-                                <div class="story-summary">${group.group_summary}</div>
+                                <div class="story-summary">${escapeHtml(group.group_summary)}</div>
                         `;
                         
                         if (group.stories && group.stories.length > 0) {
@@ -1015,7 +1024,7 @@
                                 const source = story.source.split('<')[0].trim().replace('.com', '');
                                 html += `
                                     <div class="perspective">
-                                        <span class="source">${source}:</span> ${story.angle}
+                                        <span class="source">${escapeHtml(source)}:</span> ${escapeHtml(story.angle)}
                                     </div>
                                 `;
                             });
@@ -1031,7 +1040,7 @@
                     html += '<h2 class="section-title">📌 In Brief</h2>';
                     html += '<div class="brief-items">';
                     analysis.remaining_stories.forEach(story => {
-                        html += `<div class="brief-item">${story.headline}</div>`;
+                        html += `<div class="brief-item">${escapeHtml(story.headline)}</div>`;
                     });
                     html += '</div>';
                 }
