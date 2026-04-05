@@ -445,8 +445,24 @@ def _fetch_one_message(args):
         service = _worker_thread_locals.gmail_service
         msg = service.users().messages().get(userId='me', id=message_id, format='full').execute()
         headers = msg['payload']['headers']
-        subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
-        sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'No Sender')
+
+        # ⚡ Bolt: Optimize header extraction. Avoids multiple O(n) loops and redundant .lower() calls.
+        subject = None
+        sender = None
+        for h in headers:
+            name_lower = h['name'].lower()
+            if subject is None and name_lower == 'subject':
+                subject = h['value']
+            elif sender is None and name_lower == 'from':
+                sender = h['value']
+            if subject is not None and sender is not None:
+                break
+
+        if subject is None:
+            subject = 'No Subject'
+        if sender is None:
+            sender = 'No Sender'
+
         body_data = ""
         if 'parts' in msg['payload']:
             for part in msg['payload']['parts']:
