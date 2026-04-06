@@ -59,18 +59,10 @@ if allowed_origins:
     origins_list = [origin.strip() for origin in allowed_origins.split(",") if origin.strip()]
     CORS(app, supports_credentials=True, origins=origins_list)
 else:
-    if os.environ.get("FLASK_ENV") == "production":
-        # 🛡️ Sentinel: Default to empty origins in production to prevent overly permissive CORS
-        CORS(app, supports_credentials=True, origins=[])
-    else:
-        # Default local origins for development
-        default_dev_origins = [
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://localhost:5000",
-            "http://127.0.0.1:5000"
-        ]
-        CORS(app, supports_credentials=True, origins=default_dev_origins)
+    # 🛡️ Sentinel: Default to empty origins to prevent overly permissive CORS across all environments
+    if os.environ.get("FLASK_ENV") != "production":
+        print(" * WARNING: ALLOWED_ORIGINS not set. Defaulting to empty origins. Cross-origin requests will be blocked. Please configure ALLOWED_ORIGINS for local development.")
+    CORS(app, supports_credentials=True, origins=[])
 
 
 # --- Rate Limiting ---
