@@ -9,3 +9,8 @@
 **Learning:** Missing schema validation on incoming JSON data exposes the application to data integrity issues and potential denial-of-service (storage exhaustion) if attackers submit massive or unexpected structures. Validating the core structure limits the attack surface and ensures expected downstream parsing.
 
 **Prevention:** Always perform type validation (e.g., `isinstance(data, dict)`) and key presence verification (`'expected_key' in data`) for endpoints accepting JSON data before processing or storing it.
+
+## 2024-06-03 - Prevent XSS in manual HTML string concatenation for PDF generation
+**Vulnerability:** The frontend application manually concatenated unescaped JSON properties from an LLM response (based on email contents) into an HTML string for PDF generation, which was then loaded into a new window.
+**Learning:** Even when the data displayed in the UI is safely rendered (e.g., by React), secondary outputs like printable PDFs or exported documents constructed via manual string concatenation (`html += ...`) bypass these safety mechanisms. When the data originates from an LLM processing untrusted external input (like emails), this creates a severe XSS vector where prompt injection can lead to script execution in the context of the application's origin (via `window.open`).
+**Prevention:** Always sanitize or HTML-escape dynamic data before concatenating it into raw HTML strings, regardless of whether the primary UI rendering mechanism is considered safe. Do not trust LLM output to be benign, especially when it digests arbitrary external data.

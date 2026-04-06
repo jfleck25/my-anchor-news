@@ -15,7 +15,7 @@ MOCKED_MODULES = [
     'sentry_sdk.integrations', 'sentry_sdk.integrations.flask', 'dotenv'
 ]
 
-class TestGetSharedBriefing(unittest.TestCase):
+class TestSharedBriefing(unittest.TestCase):
     def setUp(self):
         self.mocks = {mod: MagicMock() for mod in MOCKED_MODULES}
 
@@ -51,6 +51,16 @@ class TestGetSharedBriefing(unittest.TestCase):
 
             self.assertEqual(result, ({'error': 'Unable to load shared briefing. Please try again.'}, 500))
             self.mock_flask.jsonify.assert_called_once_with({'error': 'Unable to load shared briefing. Please try again.'})
+
+    def test_share_briefing_no_data(self):
+        self.main_module.session = {'credentials': 'dummy_creds'}
+        self.main_module.request = MagicMock()
+        self.main_module.request.get_json.return_value = None
+
+        result = self.main_module.share_briefing()
+
+        self.assertEqual(result, ({'error': 'No data'}, 400))
+        self.mock_flask.jsonify.assert_called_with({'error': 'No data'})
 
 if __name__ == '__main__':
     unittest.main()
