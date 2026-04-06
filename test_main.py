@@ -47,7 +47,7 @@ def test_index_route(client):
     # At minimum, asserting we get a response object without blowing up.
     assert response.status_code in [200, 302, 401]
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 import sys
 import threading
 
