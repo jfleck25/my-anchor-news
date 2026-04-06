@@ -355,6 +355,11 @@ def optimize_newsletter_for_llm(html_content: str, max_chars: int = 15000) -> st
     # REVIEW UPDATE: We use BeautifulSoup instead of simple regex to ensure we don't 
     # extract the inner text of <script> and <style> tags, saving more tokens.
     soup = BeautifulSoup(html_content, "lxml")
+
+    # Remove script and style elements
+    for script_or_style in soup(["script", "style"]):
+        script_or_style.decompose()
+
     text_only = soup.get_text(separator=' ', strip=True)
     # Remove extra whitespace (newline, tabs)
     clean_text = ' '.join(text_only.split())
