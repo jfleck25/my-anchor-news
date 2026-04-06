@@ -27,7 +27,7 @@ from bs4 import BeautifulSoup
 import google.auth.transport.requests 
 from werkzeug.middleware.proxy_fix import ProxyFix
 import psycopg2 
-from psycopg2 import pool
+import psycopg2.pool
 from psycopg2.extras import RealDictCursor
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
