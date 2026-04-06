@@ -1,5 +1,5 @@
 import sys
-from playwright.sync_api import Page, expect
+from playwright.sync_api import Page
 import json
 
 def test_frontend_loads_without_errors(page: Page, live_server):
