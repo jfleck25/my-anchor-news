@@ -85,7 +85,7 @@ limiter = Limiter(
 _secret_key = os.environ.get("FLASK_SECRET_KEY")
 if os.environ.get("FLASK_ENV") == "production" and not _secret_key:
     raise RuntimeError("FLASK_SECRET_KEY must be set in production")
-app.secret_key = _secret_key or "default_secret_key_for_development"
+app.secret_key = _secret_key or secrets.token_hex(32)
 
 # Enable detailed error messages in development
 if os.environ.get("FLASK_ENV") != "production":
