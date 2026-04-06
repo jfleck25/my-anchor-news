@@ -557,7 +557,7 @@ def login():
         error_trace = traceback.format_exc()
         print(f"ERROR in login route: {e}")
         print(error_trace)
-        return jsonify({'error': f'Login failed: {str(e)}'}), 500
+        return jsonify({'error': 'Login failed. Please try again.', 'details': None}), 500
 
 @app.route('/oauth2callback')
 def oauth2callback():
