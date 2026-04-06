@@ -789,7 +789,10 @@ def generate_audio():
 def share_briefing():
     if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
     data = request.get_json()
-    if not data: return jsonify({'error': 'No data'}), 400
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Invalid data format. Expected a JSON object.'}), 400
+    if not ('story_groups' in data or 'remaining_stories' in data):
+        return jsonify({'error': 'Invalid data content. Required fields missing.'}), 400
     share_id = str(uuid.uuid4())
     if DATABASE_URL:
         try:
