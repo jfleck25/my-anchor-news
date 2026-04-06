@@ -24,7 +24,7 @@ import google.generativeai as genai
 from google.cloud import texttospeech
 from google.api_core import client_options 
 from bs4 import BeautifulSoup
-import google.auth.transport.requests 
+from google.auth.transport.requests import Request
 from werkzeug.middleware.proxy_fix import ProxyFix
 import psycopg2 
 from psycopg2 import pool
@@ -729,7 +729,7 @@ def generate_audio():
         return jsonify({'error': 'Your session expired. Please log in again.'}), 401
     creds = Credentials(**creds_data)
     try:
-        auth_req = google.auth.transport.requests.Request()
+        auth_req = Request()
         if creds.expired:
             creds.refresh(auth_req)
             session_creds = session.get('credentials')
