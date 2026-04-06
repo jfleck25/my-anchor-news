@@ -46,12 +46,8 @@ class TestErrorHandler(unittest.TestCase):
         data = response.get_json()
         self.assertIsNotNone(data)
         self.assertEqual(data.get('error'), "Something went wrong. Please try again or log in again.")
-        self.assertIsNotNone(data.get('details'))
-
-        # The traceback might be truncated in the error details response ([:500])
-        # "Simulated server error" might be truncated if the traceback is too long
-        # Instead of assertIn, let's just assert the details starts with "Traceback"
-        self.assertTrue(data.get('details').startswith('Traceback (most recent call last):'))
+        # 🛡️ Sentinel: Details should now be None even in DEBUG mode to prevent info leaks
+        self.assertIsNone(data.get('details'))
 
 if __name__ == '__main__':
     unittest.main()

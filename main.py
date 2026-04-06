@@ -107,7 +107,7 @@ def handle_500_error(e):
     print(error_trace)
     # Don't expose raw upstream (Google/Gemini) errors to client
     safe_msg = "Something went wrong. Please try again or log in again."
-    return jsonify({'error': safe_msg, 'details': error_trace[:500] if app.config.get('DEBUG') else None}), 500
+    return jsonify({'error': safe_msg, 'details': None}), 500
 
 SCOPES = [
     'https://www.googleapis.com/auth/userinfo.email',
