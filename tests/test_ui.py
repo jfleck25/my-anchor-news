@@ -1,4 +1,3 @@
-import pytest
 import sys
 from playwright.sync_api import Page, expect
 import json
