@@ -621,9 +621,17 @@ def update_settings():
     new_settings = request.get_json()
     if not isinstance(new_settings, dict):
         return jsonify({'error': 'Invalid request.'}), 400
+
+    # 🛡️ Sentinel: Prevent mass assignment by plucking only allowed keys
+    allowed_keys = ['sources', 'time_window_hours', 'personality', 'priority_sources', 'keywords']
+    sanitized_settings = {}
+    for key in allowed_keys:
+        if key in new_settings:
+            sanitized_settings[key] = new_settings[key]
+
     user_info = get_user_info()
     email = user_info.get('email') if user_info else None
-    if save_settings(new_settings, email):
+    if save_settings(sanitized_settings, email):
         return jsonify({'status': 'success'})
     return jsonify({'error': 'Unable to save settings. Please try again or contact support if the issue persists.'}), 500
 
