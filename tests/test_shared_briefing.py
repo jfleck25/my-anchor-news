@@ -11,6 +11,7 @@ MOCKED_MODULES = [
     'google.api_core', 'bs4', 'google.auth', 'google.auth.transport',
     'google.auth.transport.requests', 'werkzeug', 'werkzeug.middleware',
     'werkzeug.middleware.proxy_fix', 'psycopg2', 'psycopg2.extras',
+    'psycopg2.pool',
     'flask_limiter', 'flask_limiter.util', 'sentry_sdk',
     'sentry_sdk.integrations', 'sentry_sdk.integrations.flask', 'dotenv'
 ]
@@ -59,8 +60,8 @@ class TestSharedBriefing(unittest.TestCase):
 
         result = self.main_module.share_briefing()
 
-        self.assertEqual(result, ({'error': 'No data'}, 400))
-        self.mock_flask.jsonify.assert_called_with({'error': 'No data'})
+        self.assertEqual(result, ({'error': 'Invalid data format. Expected a JSON object.'}, 400))
+        self.mock_flask.jsonify.assert_called_with({'error': 'Invalid data format. Expected a JSON object.'})
 
 if __name__ == '__main__':
     unittest.main()
