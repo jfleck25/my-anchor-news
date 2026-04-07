@@ -23,3 +23,11 @@
 **Vulnerability:** The frontend application manually concatenated unescaped JSON properties from an LLM response (based on email contents) into an HTML string for PDF generation, which was then loaded into a new window.
 **Learning:** Even when the data displayed in the UI is safely rendered (e.g., by React), secondary outputs like printable PDFs or exported documents constructed via manual string concatenation (`html += ...`) bypass these safety mechanisms. When the data originates from an LLM processing untrusted external input (like emails), this creates a severe XSS vector where prompt injection can lead to script execution in the context of the application's origin (via `window.open`).
 **Prevention:** Always sanitize or HTML-escape dynamic data before concatenating it into raw HTML strings, regardless of whether the primary UI rendering mechanism is considered safe. Do not trust LLM output to be benign, especially when it digests arbitrary external data.
+
+## $(date +%Y-%m-%d) - Insufficient Data Validation in Share Endpoint
+
+**Vulnerability:** The `/api/share` endpoint failed to enforce a strict schema on the incoming JSON payload before storing it in the `shared_briefings` PostgreSQL table. It only checked that the expected keys (`story_groups` or `remaining_stories`) existed somewhere in the JSON payload, leaving it vulnerable to mass assignment or abusive storage if an attacker injected arbitrary, large, or malicious keys into the JSON payload alongside the expected ones.
+
+**Learning:** When interacting with schemaless database fields like JSONB or when directly dumping JSON objects, it's not enough to just verify the presence of required keys. Explicitly constructing a new dictionary with only the expected keys prevents uncontrolled data inclusion and reduces the attack surface.
+
+**Prevention:** Always sanitize input by plucking only the explicitly allowed fields from user-provided objects rather than inserting the entire object directly into the database, even if some initial validation passed.

@@ -1,7 +1,8 @@
-🎯 **What:** Removed the unused local `pool` import in `main.py` by changing `from psycopg2 import pool` to `import psycopg2.pool`.
+🎯 What:
+Fixed an Insufficient Data Validation vulnerability in the `/api/share` endpoint (`main.py`). The endpoint previously accepted any arbitrary JSON payload and stored it directly in the database as long as one of the expected keys (`story_groups` or `remaining_stories`) was present. The fix introduces strict schema enforcement by explicitly constructing a `sanitized_data` dictionary containing only the allowed keys before database insertion.
 
-💡 **Why:** `from psycopg2 import pool` defines `pool` as a local variable which is never used directly, as the code uses the fully-qualified `psycopg2.pool.ThreadedConnectionPool`. Simply removing the import statement isn't viable because `import psycopg2` does not automatically load the `pool` submodule. Changing to `import psycopg2.pool` correctly resolves the linter warning about an unused local while ensuring the submodule is loaded properly.
+⚠️ Risk:
+By failing to strictly filter incoming JSON data before storage, the application was vulnerable to Mass Assignment and abusive storage attacks. An attacker could inject enormous, arbitrary, or malicious JSON blobs into the database alongside valid data. This could lead to resource exhaustion (database bloat), denial of service, or potentially exploit downstream parsers/consumers that read the `shared_briefings` data.
 
-✅ **Verification:** Verified via `flake8 main.py --select=F401` that the unused import warning is resolved. Verified via `pytest` that tests pass without throwing `AttributeError: module 'psycopg2' has no attribute 'pool'`. Tested loading module successfully using local venv.
-
-✨ **Result:** A cleaner codebase with fewer linter warnings while maintaining robust database pooling functionality.
+🛡️ Solution:
+Updated `share_briefing()` in `main.py` to extract only the specific keys required for the feature (`story_groups` and `remaining_stories`) into a new dictionary. Any other injected keys in the request payload are safely discarded before being serialized to JSON and inserted into PostgreSQL. Added comprehensive unit tests in `test_share_briefing.py` and `test_shared_briefing.py` to verify the isolation and safety of the endpoint.

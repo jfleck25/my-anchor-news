@@ -811,13 +811,20 @@ def share_briefing():
         return jsonify({'error': 'Invalid data format. Expected a JSON object.'}), 400
     if not ('story_groups' in data or 'remaining_stories' in data):
         return jsonify({'error': 'Invalid data content. Required fields missing.'}), 400
+
+    sanitized_data = {}
+    if 'story_groups' in data:
+        sanitized_data['story_groups'] = data['story_groups']
+    if 'remaining_stories' in data:
+        sanitized_data['remaining_stories'] = data['remaining_stories']
+
     share_id = str(uuid.uuid4())
     if DATABASE_URL:
         try:
             conn = get_db_connection()
             try:
                 cur = conn.cursor()
-                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(data)))
+                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(sanitized_data)))
                 conn.commit(); cur.close()
             finally:
                 release_db_connection(conn)

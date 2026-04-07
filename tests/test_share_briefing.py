@@ -5,11 +5,12 @@ from unittest.mock import MagicMock, patch
 import importlib
 
 MOCKED_MODULES = [
-    'flask_cors', 'google_auth_oauthlib', 'google_auth_oauthlib.flow',
+    'google_auth_oauthlib', 'google_auth_oauthlib.flow',
     'google', 'google.oauth2', 'google.oauth2.credentials', 'googleapiclient',
     'googleapiclient.discovery', 'google.generativeai', 'google.cloud',
     'google.api_core', 'bs4', 'google.auth', 'google.auth.transport',
     'google.auth.transport.requests', 'psycopg2', 'psycopg2.extras',
+    'psycopg2.pool',
     'sentry_sdk', 'sentry_sdk.integrations', 'sentry_sdk.integrations.flask'
 ]
 
@@ -86,6 +87,43 @@ class TestShareBriefing(unittest.TestCase):
             response = self.client.post('/api/share', json={"story_groups": [{"group_headline": "Test"}]})
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json, {'share_id': 'fake_uuid'})
+
+        mock_cursor.execute.assert_called_once()
+        mock_conn.commit.assert_called_once()
+        mock_cursor.close.assert_called_once()
+        mock_release.assert_called_once_with(mock_conn)
+
+    @patch('main.get_db_connection')
+    @patch('main.release_db_connection')
+    def test_share_briefing_strips_extra_keys(self, mock_release, mock_get):
+        self.main_module.DATABASE_URL = "postgres://dummy"
+        mock_conn = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_get.return_value = mock_conn
+
+        with self.client.session_transaction() as sess:
+            sess['credentials'] = {'token': 'fake_token'}
+
+        with patch('uuid.uuid4', return_value="fake_uuid"):
+            response = self.client.post('/api/share', json={
+                "story_groups": [{"group_headline": "Test"}],
+                "malicious_key": "huge_amount_of_data",
+                "another_unwanted": "field"
+            })
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json, {'share_id': 'fake_uuid'})
+
+        # Verify only the expected keys were passed to json.dumps in the DB call
+        call_args = mock_cursor.execute.call_args[0]
+        # execute args are (query_string, (share_id, json_dumped_data))
+        inserted_json = call_args[1][1]
+        import json
+        inserted_data = json.loads(inserted_json)
+
+        self.assertIn("story_groups", inserted_data)
+        self.assertNotIn("malicious_key", inserted_data)
+        self.assertNotIn("another_unwanted", inserted_data)
 
         mock_cursor.execute.assert_called_once()
         mock_conn.commit.assert_called_once()
