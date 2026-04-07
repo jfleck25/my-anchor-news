@@ -23,6 +23,7 @@ from googleapiclient.discovery import build
 import google.generativeai as genai
 from google.cloud import texttospeech
 from google.api_core import client_options 
+from google.api_core.exceptions import ResourceExhausted, InvalidArgument
 from bs4 import BeautifulSoup
 from google.auth.transport.requests import Request, AuthorizedSession
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -389,6 +390,11 @@ def generate_script_from_analysis(analysis_json, style="anchor"):
 
 def analyze_news_with_llm(newsletters_text):
     if not model: raise Exception("Gemini API model is not configured.")
+    
+    # Pre-validation check
+    if len(newsletters_text) > 150000:
+        return {"error": "Too much newsletter content to process at once. Please reduce your lookback window in settings."}
+
     prompt = """
     You are an elite media analyst. Provide raw text from multiple newsletters.
     Task:
@@ -407,6 +413,17 @@ def analyze_news_with_llm(newsletters_text):
     try:
         generation_config = genai.types.GenerationConfig(max_output_tokens=8192, temperature=0.2)
         response = model.generate_content(prompt, generation_config=generation_config)
+        
+        # Check finish reason
+        if response.candidates:
+            finish_reason = response.candidates[0].finish_reason
+            if finish_reason == 2: # MAX_TOKENS
+                return {"error": "The briefing was too long to generate. Try reducing your sources or lookback period."}
+            elif finish_reason == 3: # SAFETY
+                return {"error": "The analysis was blocked due to safety filters."}
+            elif finish_reason not in [1, 0] and hasattr(finish_reason, 'value') and finish_reason.value not in [1, 0]:
+                return {"error": "The AI encountered an unexpected interruption. Please try again."}
+
         text = getattr(response, 'text', None)
         if not text:
             return {"error": "AI analysis failed."}
@@ -414,9 +431,16 @@ def analyze_news_with_llm(newsletters_text):
         if match: return json.loads(match.group(0))
         else: raise ValueError("No valid JSON found.")
     except json.JSONDecodeError:
-        return {"error": "Analysis failed due to volume."}
+        return {"error": "The AI failed to format the analysis correctly. Please try again."}
+    except ResourceExhausted:
+        return {"error": "AI service is currently overloaded. Please wait a minute before trying again."}
+    except InvalidArgument:
+        return {"error": "The newsletter content is too large for the current AI model capacity."}
     except Exception as e:
         print(f"LLM analysis error: {e}")
+        err_str = str(e).lower()
+        if "quota" in err_str:
+            return {"error": "AI rate limit reached. Please try again in a few minutes."}
         return {"error": "AI analysis failed."}
 
 # --- Caching Helpers ---
