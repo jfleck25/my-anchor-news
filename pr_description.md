@@ -1,7 +1,11 @@
-🎯 **What:** Removed the unused local `pool` import in `main.py` by changing `from psycopg2 import pool` to `import psycopg2.pool`.
+🧪 [testing improvement description]
 
-💡 **Why:** `from psycopg2 import pool` defines `pool` as a local variable which is never used directly, as the code uses the fully-qualified `psycopg2.pool.ThreadedConnectionPool`. Simply removing the import statement isn't viable because `import psycopg2` does not automatically load the `pool` submodule. Changing to `import psycopg2.pool` correctly resolves the linter warning about an unused local while ensuring the submodule is loaded properly.
+🎯 **What:**
+Added unit tests for the `/api/check_auth` API route in `main.py` which was previously untested. The tests patch `main.get_user_info` to isolate the logic.
 
-✅ **Verification:** Verified via `flake8 main.py --select=F401` that the unused import warning is resolved. Verified via `pytest` that tests pass without throwing `AttributeError: module 'psycopg2' has no attribute 'pool'`. Tested loading module successfully using local venv.
+📊 **Coverage:**
+- Tested the scenario where a user is logged in (mocked `get_user_info` returns a populated user dictionary), validating the JSON response contains `logged_in: True` and the `user` data.
+- Tested the scenario where a user is logged out (mocked `get_user_info` returns `None`), validating the JSON response contains `logged_in: False` and lacks user data.
 
-✨ **Result:** A cleaner codebase with fewer linter warnings while maintaining robust database pooling functionality.
+✨ **Result:**
+Increased test coverage by ensuring the authentication check endpoint correctly maps the application's internal state to the corresponding JSON API response, catching potential regressions in API responses.
