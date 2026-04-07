@@ -24,10 +24,18 @@
 **Learning:** Even when the data displayed in the UI is safely rendered (e.g., by React), secondary outputs like printable PDFs or exported documents constructed via manual string concatenation (`html += ...`) bypass these safety mechanisms. When the data originates from an LLM processing untrusted external input (like emails), this creates a severe XSS vector where prompt injection can lead to script execution in the context of the application's origin (via `window.open`).
 **Prevention:** Always sanitize or HTML-escape dynamic data before concatenating it into raw HTML strings, regardless of whether the primary UI rendering mechanism is considered safe. Do not trust LLM output to be benign, especially when it digests arbitrary external data.
 
-## $(date +%Y-%m-%d) - Insufficient Data Validation in Share Endpoint
+## 2025-04-06 - Insufficient Data Validation in Share Endpoint
 
 **Vulnerability:** The `/api/share` endpoint failed to enforce a strict schema on the incoming JSON payload before storing it in the `shared_briefings` PostgreSQL table. It only checked that the expected keys (`story_groups` or `remaining_stories`) existed somewhere in the JSON payload, leaving it vulnerable to mass assignment or abusive storage if an attacker injected arbitrary, large, or malicious keys into the JSON payload alongside the expected ones.
 
 **Learning:** When interacting with schemaless database fields like JSONB or when directly dumping JSON objects, it's not enough to just verify the presence of required keys. Explicitly constructing a new dictionary with only the expected keys prevents uncontrolled data inclusion and reduces the attack surface.
 
 **Prevention:** Always sanitize input by plucking only the explicitly allowed fields from user-provided objects rather than inserting the entire object directly into the database, even if some initial validation passed.
+
+## 2026-04-07 - Mass Assignment Vulnerability in Settings Endpoint
+
+**Vulnerability:** The `/api/settings` endpoint was previously accepting arbitrary JSON payloads via `request.get_json()` and passing them directly to `save_settings()`. This resulted in a mass assignment vulnerability where attackers could supply extraneous or large data payloads (e.g., `"malicious_key": "some_bad_data"`, `"huge_payload": "..."`), which were then blindly serialized and stored in PostgreSQL or the settings file.
+
+**Learning:** When APIs accept JSON data for update operations, directly saving the entire raw payload exposes the application to mass assignment. Attackers could bloat the database, overwrite unintended fields, or store configurations outside expected parameters.
+
+**Prevention:** To prevent mass assignment, always enforce a strict schema on incoming JSON payloads. Before saving or processing updates, explicitly extract only the allowed, expected keys into a new, sanitized dictionary rather than trusting the raw user input.
