@@ -356,9 +356,10 @@ def optimize_newsletter_for_llm(html_content: str, max_chars: int = 15000) -> st
     # extract the inner text of <script> and <style> tags, saving more tokens.
     soup = BeautifulSoup(html_content, "lxml")
 
-    # Remove script and style elements
-    for script_or_style in soup(["script", "style"]):
-        script_or_style.decompose()
+    # ⚡ Bolt: Decompose script and style tags to actually prevent their text from being extracted.
+    # BeautifulSoup's get_text() includes the inner content of these tags by default.
+    for element in soup(["script", "style"]):
+        element.decompose()
 
     text_only = soup.get_text(separator=' ', strip=True)
     # Remove extra whitespace (newline, tabs)
