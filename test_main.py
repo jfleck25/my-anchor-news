@@ -19,6 +19,7 @@ sys.modules['googleapiclient.discovery'] = MagicMock()
 sys.modules['dotenv'] = MagicMock()
 sys.modules['psycopg2'] = MagicMock()
 sys.modules['psycopg2.extras'] = MagicMock()
+sys.modules['psycopg2.pool'] = MagicMock()
 sys.modules['sentry_sdk'] = MagicMock()
 sys.modules['sentry_sdk.integrations'] = MagicMock()
 sys.modules['sentry_sdk.integrations.flask'] = MagicMock()
@@ -46,7 +47,7 @@ def test_index_route(client):
     # At minimum, asserting we get a response object without blowing up.
     assert response.status_code in [200, 302, 401]
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 import sys
 import threading
 

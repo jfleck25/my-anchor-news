@@ -5,7 +5,7 @@ import requests
 from main import app as flask_app
 
 def run_server(app, port):
-    app.run(port=port, use_reloader=False)
+    app.run(port=port, use_reloader=False, debug=False)
 
 @pytest.fixture(scope="session")
 def live_server():
