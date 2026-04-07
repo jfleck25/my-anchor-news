@@ -447,18 +447,21 @@ def _fetch_one_message(args):
         msg = service.users().messages().get(userId='me', id=message_id, format='full').execute()
         headers = msg['payload']['headers']
 
-        # ⚡ Bolt: Replace multiple generator expressions with a single loop for header extraction
-        # This prevents iterating over the headers array twice and allows early short-circuiting
+        # ⚡ Bolt: Extract subject and sender in a single pass, avoiding redundant .lower() calls
         subject = 'No Subject'
         sender = 'No Sender'
+        found_subject = False
+        found_sender = False
         for h in headers:
             name_lower = h['name'].lower()
-            if name_lower == 'subject':
+            if not found_subject and name_lower == 'subject':
                 subject = h['value']
-                if sender != 'No Sender': break
-            elif name_lower == 'from':
+                found_subject = True
+            elif not found_sender and name_lower == 'from':
                 sender = h['value']
-                if subject != 'No Subject': break
+                found_sender = True
+            if found_subject and found_sender:
+                break
 
         body_data = ""
         if 'parts' in msg['payload']:
