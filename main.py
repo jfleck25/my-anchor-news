@@ -24,7 +24,7 @@ import google.generativeai as genai
 from google.cloud import texttospeech
 from google.api_core import client_options 
 from bs4 import BeautifulSoup
-from google.auth.transport.requests import Request
+from google.auth.transport.requests import Request, AuthorizedSession
 from werkzeug.middleware.proxy_fix import ProxyFix
 import psycopg2 
 import psycopg2.pool
@@ -247,8 +247,11 @@ def get_user_info():
         return session['user_info']
     try:
         credentials = get_credentials_from_session(session['credentials'])
-        user_info_service = build('oauth2', 'v2', credentials=credentials)
-        user_info = user_info_service.userinfo().get().execute()
+        # ⚡ Bolt: Use AuthorizedSession for direct REST call to avoid discovery document overhead
+        authed_session = AuthorizedSession(credentials)
+        response = authed_session.get('https://www.googleapis.com/oauth2/v2/userinfo')
+        response.raise_for_status()
+        user_info = response.json()
         session['user_info'] = user_info
         return user_info
     except Exception as ex:

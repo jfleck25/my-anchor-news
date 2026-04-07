@@ -22,16 +22,18 @@ class TestGetUserInfo(unittest.TestCase):
             self.assertEqual(result, {'email': 'test@example.com'})
 
     @patch('main.get_credentials_from_session')
-    @patch('main.build')
-    def test_fetch_user_info_success(self, mock_build, mock_get_credentials):
+    @patch('main.AuthorizedSession')
+    def test_fetch_user_info_success(self, mock_auth_session, mock_get_credentials):
         mock_credentials = MagicMock()
         mock_get_credentials.return_value = mock_credentials
 
-        mock_service = MagicMock()
-        mock_build.return_value = mock_service
+        mock_session_instance = MagicMock()
+        mock_auth_session.return_value = mock_session_instance
 
+        mock_response = MagicMock()
         mock_user_info = {'email': 'fetched@example.com'}
-        mock_service.userinfo().get().execute.return_value = mock_user_info
+        mock_response.json.return_value = mock_user_info
+        mock_session_instance.get.return_value = mock_response
 
         with self.app.test_request_context():
             session['credentials'] = 'test_creds'
@@ -39,10 +41,12 @@ class TestGetUserInfo(unittest.TestCase):
 
             self.assertEqual(result, mock_user_info)
             self.assertEqual(session['user_info'], mock_user_info)
+            mock_session_instance.get.assert_called_once_with('https://www.googleapis.com/oauth2/v2/userinfo')
+            mock_response.raise_for_status.assert_called_once()
 
     @patch('main.get_credentials_from_session')
-    @patch('main.build')
-    def test_fetch_user_info_exception(self, mock_build, mock_get_credentials):
+    @patch('main.AuthorizedSession')
+    def test_fetch_user_info_exception(self, mock_auth_session, mock_get_credentials):
         mock_get_credentials.side_effect = Exception("Failed to get credentials")
 
         with self.app.test_request_context():
@@ -56,15 +60,15 @@ class TestGetUserInfo(unittest.TestCase):
             self.assertNotIn('user_info', session)
 
     @patch('main.get_credentials_from_session')
-    @patch('main.build')
-    def test_fetch_user_info_exception_pops(self, mock_build, mock_get_credentials):
+    @patch('main.AuthorizedSession')
+    def test_fetch_user_info_exception_pops(self, mock_auth_session, mock_get_credentials):
         mock_credentials = MagicMock()
         mock_get_credentials.return_value = mock_credentials
 
-        mock_service = MagicMock()
-        mock_build.return_value = mock_service
+        mock_session_instance = MagicMock()
+        mock_auth_session.return_value = mock_session_instance
 
-        mock_service.userinfo().get().execute.side_effect = Exception("API error")
+        mock_session_instance.get.side_effect = Exception("API error")
 
         with self.app.test_request_context():
             session['credentials'] = 'test_creds'
