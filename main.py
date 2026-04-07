@@ -809,6 +809,11 @@ def share_briefing():
         return jsonify({'error': 'Invalid data format. Expected a JSON object.'}), 400
     if not ('story_groups' in data or 'remaining_stories' in data):
         return jsonify({'error': 'Invalid data content. Required fields missing.'}), 400
+
+    allowed_keys = {'story_groups', 'remaining_stories'}
+    validated_data = {k: data[k] for k in allowed_keys if k in data}
+    data = validated_data
+
     share_id = str(uuid.uuid4())
     if DATABASE_URL:
         try:
