@@ -27,3 +27,24 @@
 **Vulnerability:** The `/api/share` endpoint accepted arbitrarily large or malicious JSON dictionaries containing unvalidated keys and inserted them directly into PostgreSQL. This could lead to database bloat or unexpected downstream parsing issues.
 **Learning:** Checking for the presence of required keys is not the same as ensuring *only* those keys are present. An attacker can append extra arbitrary data if the input is not strictly filtered.
 **Prevention:** Always validate and filter user-provided JSON structures to an explicit allowlist of known keys before serialization and storage.
+
+## 2025-04-06 - Insufficient Data Validation in Share Endpoint
+
+**Vulnerability:** The `/api/share` endpoint failed to enforce a strict schema on the incoming JSON payload before storing it in the `shared_briefings` PostgreSQL table. It only checked that the expected keys (`story_groups` or `remaining_stories`) existed somewhere in the JSON payload, leaving it vulnerable to mass assignment or abusive storage if an attacker injected arbitrary, large, or malicious keys into the JSON payload alongside the expected ones.
+
+**Learning:** When interacting with schemaless database fields like JSONB or when directly dumping JSON objects, it's not enough to just verify the presence of required keys. Explicitly constructing a new dictionary with only the expected keys prevents uncontrolled data inclusion and reduces the attack surface.
+
+**Prevention:** Always sanitize input by plucking only the explicitly allowed fields from user-provided objects rather than inserting the entire object directly into the database, even if some initial validation passed.
+
+## 2026-04-07 - Mass Assignment Vulnerability in Settings Endpoint
+
+**Vulnerability:** The `/api/settings` endpoint was previously accepting arbitrary JSON payloads via `request.get_json()` and passing them directly to `save_settings()`. This resulted in a mass assignment vulnerability where attackers could supply extraneous or large data payloads (e.g., `"malicious_key": "some_bad_data"`, `"huge_payload": "..."`), which were then blindly serialized and stored in PostgreSQL or the settings file.
+
+**Learning:** When APIs accept JSON data for update operations, directly saving the entire raw payload exposes the application to mass assignment. Attackers could bloat the database, overwrite unintended fields, or store configurations outside expected parameters.
+
+**Prevention:** To prevent mass assignment, always enforce a strict schema on incoming JSON payloads. Before saving or processing updates, explicitly extract only the allowed, expected keys into a new, sanitized dictionary rather than trusting the raw user input.
+## 2025-04-06 - Cross-Tenant Data Leak in Ephemeral Cache
+
+**Vulnerability:** The application used an ephemeral, file-based cache (`cache.json`) to store generated email briefings (`cache['analysis']`) and synthesized audio (`cache['audio']`). However, the cache was global and only keyed by the user's `settings_hash` and the audio's `script_hash`. If two distinct users shared the same settings configuration (e.g., the default settings), a subsequent user could hit the cache and receive the private, sensitive email analysis or generated audio of the previous user.
+**Learning:** Storing private data in a global cache that is only keyed by configuration parameters (like settings hashes) instead of explicit user identifiers creates a severe Cross-Tenant Data Leak (Information Disclosure) vulnerability.
+**Prevention:** Always partition or scope cached data using a strong, unique user identifier (e.g., `user_id` or `email`) to ensure that one tenant's sensitive information is completely isolated and inaccessible to another, even if they share identical application states or configurations.

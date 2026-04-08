@@ -23,8 +23,9 @@ from googleapiclient.discovery import build
 import google.generativeai as genai
 from google.cloud import texttospeech
 from google.api_core import client_options 
+from google.api_core.exceptions import ResourceExhausted, InvalidArgument
 from bs4 import BeautifulSoup
-from google.auth.transport.requests import Request
+from google.auth.transport.requests import Request, AuthorizedSession
 from werkzeug.middleware.proxy_fix import ProxyFix
 import psycopg2 
 import psycopg2.pool
@@ -247,8 +248,11 @@ def get_user_info():
         return session['user_info']
     try:
         credentials = get_credentials_from_session(session['credentials'])
-        user_info_service = build('oauth2', 'v2', credentials=credentials)
-        user_info = user_info_service.userinfo().get().execute()
+        # ⚡ Bolt: Use AuthorizedSession for direct REST call to avoid discovery document overhead
+        authed_session = AuthorizedSession(credentials)
+        response = authed_session.get('https://www.googleapis.com/oauth2/v2/userinfo')
+        response.raise_for_status()
+        user_info = response.json()
         session['user_info'] = user_info
         return user_info
     except Exception as ex:
@@ -386,6 +390,11 @@ def generate_script_from_analysis(analysis_json, style="anchor"):
 
 def analyze_news_with_llm(newsletters_text):
     if not model: raise Exception("Gemini API model is not configured.")
+    
+    # Pre-validation check
+    if len(newsletters_text) > 800000:
+        return {"error": "Too much newsletter content to process at once. Please reduce your lookback window in settings."}
+
     prompt = """
     You are an elite media analyst. Provide raw text from multiple newsletters.
     Task:
@@ -404,6 +413,17 @@ def analyze_news_with_llm(newsletters_text):
     try:
         generation_config = genai.types.GenerationConfig(max_output_tokens=8192, temperature=0.2)
         response = model.generate_content(prompt, generation_config=generation_config)
+        
+        # Check finish reason
+        if response.candidates:
+            finish_reason = response.candidates[0].finish_reason
+            if finish_reason == 2: # MAX_TOKENS
+                return {"error": "The briefing was too long to generate. Try reducing your sources or lookback period."}
+            elif finish_reason == 3: # SAFETY
+                return {"error": "The analysis was blocked due to safety filters."}
+            elif finish_reason not in [1, 0] and hasattr(finish_reason, 'value') and finish_reason.value not in [1, 0]:
+                return {"error": "The AI encountered an unexpected interruption. Please try again."}
+
         text = getattr(response, 'text', None)
         if not text:
             return {"error": "AI analysis failed."}
@@ -411,9 +431,16 @@ def analyze_news_with_llm(newsletters_text):
         if match: return json.loads(match.group(0))
         else: raise ValueError("No valid JSON found.")
     except json.JSONDecodeError:
-        return {"error": "Analysis failed due to volume."}
+        return {"error": "The AI failed to format the analysis correctly. Please try again."}
+    except ResourceExhausted:
+        return {"error": "AI service is currently overloaded. Please wait a minute before trying again."}
+    except InvalidArgument:
+        return {"error": "The newsletter content is too large for the current AI model capacity."}
     except Exception as e:
         print(f"LLM analysis error: {e}")
+        err_str = str(e).lower()
+        if "quota" in err_str:
+            return {"error": "AI rate limit reached. Please try again in a few minutes."}
         return {"error": "AI analysis failed."}
 
 # --- Caching Helpers ---
@@ -621,9 +648,17 @@ def update_settings():
     new_settings = request.get_json()
     if not isinstance(new_settings, dict):
         return jsonify({'error': 'Invalid request.'}), 400
+
+    # 🛡️ Sentinel: Prevent mass assignment by plucking only allowed keys
+    allowed_keys = ['sources', 'time_window_hours', 'personality', 'priority_sources', 'keywords']
+    sanitized_settings = {}
+    for key in allowed_keys:
+        if key in new_settings:
+            sanitized_settings[key] = new_settings[key]
+
     user_info = get_user_info()
     email = user_info.get('email') if user_info else None
-    if save_settings(new_settings, email):
+    if save_settings(sanitized_settings, email):
         return jsonify({'status': 'success'})
     return jsonify({'error': 'Unable to save settings. Please try again or contact support if the issue persists.'}), 500
 
@@ -657,11 +692,13 @@ def fetch_emails():
     if email: session['user_email'] = email
     settings = load_settings(email)
 
+    cache_key = email or str(user_info.get('id', 'unknown')) if user_info else 'unknown'
     current_hash = get_settings_hash(settings)
     with _cache_lock:
         cache = load_cache()
-        if (cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (cache.get('settings_hash') == current_hash) and (cache.get('analysis')):
-            return jsonify(cache['analysis'])
+        user_cache = cache.get(cache_key, {})
+        if (user_cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (user_cache.get('settings_hash') == current_hash) and (user_cache.get('analysis')):
+            return jsonify(user_cache['analysis'])
 
     creds_data = session.get('credentials')
     if not creds_data:
@@ -708,13 +745,15 @@ def fetch_emails():
 
         with _cache_lock:
             cache = load_cache()
-            cache['timestamp'] = time.time()
-            cache['settings_hash'] = current_hash
-            cache['analysis'] = analysis_result
-            if 'audio' in cache:
-                del cache['audio']
-            if 'script_hash' in cache:
-                del cache['script_hash']
+            user_cache = cache.get(cache_key, {})
+            user_cache['timestamp'] = time.time()
+            user_cache['settings_hash'] = current_hash
+            user_cache['analysis'] = analysis_result
+            if 'audio' in user_cache:
+                del user_cache['audio']
+            if 'script_hash' in user_cache:
+                del user_cache['script_hash']
+            cache[cache_key] = user_cache
             save_cache(cache)
         return jsonify(analysis_result)
     except Exception as e:
@@ -737,6 +776,7 @@ def generate_audio():
         return jsonify({'error': 'Your session expired. Please log in again.'}), 401
 
     email = user_info.get('email') if user_info else None
+    cache_key = email or str(user_info.get('id', 'unknown')) if user_info else 'unknown'
     settings = load_settings(email)
     style = settings.get('personality', 'anchor')
 
@@ -763,8 +803,9 @@ def generate_audio():
         script_hash = hashlib.md5((script_text + style).encode()).hexdigest()
         with _cache_lock:
             cache = load_cache()
-            if cache.get('script_hash') == script_hash and cache.get('audio'):
-                return jsonify({"audio_content": cache['audio']})
+            user_cache = cache.get(cache_key, {})
+            if user_cache.get('script_hash') == script_hash and user_cache.get('audio'):
+                return jsonify({"audio_content": user_cache['audio']})
 
         sentences = re.split(r'(?<=[.!?])\s+', script_text)
         chunks = []
@@ -787,8 +828,10 @@ def generate_audio():
         audio_base64 = base64.b64encode(all_audio_content).decode('utf-8')
         with _cache_lock:
             cache = load_cache()
-            cache['script_hash'] = script_hash
-            cache['audio'] = audio_base64
+            user_cache = cache.get(cache_key, {})
+            user_cache['script_hash'] = script_hash
+            user_cache['audio'] = audio_base64
+            cache[cache_key] = user_cache
             save_cache(cache)
         return jsonify({"audio_content": audio_base64})
     except Exception as e:
@@ -820,7 +863,7 @@ def share_briefing():
             conn = get_db_connection()
             try:
                 cur = conn.cursor()
-                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(data)))
+                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(sanitized_data)))
                 conn.commit(); cur.close()
             finally:
                 release_db_connection(conn)

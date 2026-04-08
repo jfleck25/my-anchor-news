@@ -1,11 +1,8 @@
-🧪 [testing improvement description]
+🎯 What:
+Fixed an Insufficient Data Validation vulnerability in the `/api/share` endpoint (`main.py`). The endpoint previously accepted any arbitrary JSON payload and stored it directly in the database as long as one of the expected keys (`story_groups` or `remaining_stories`) was present. The fix introduces strict schema enforcement by explicitly constructing a `sanitized_data` dictionary containing only the allowed keys before database insertion.
 
-🎯 **What:**
-Added unit tests for the `/api/check_auth` API route in `main.py` which was previously untested. The tests patch `main.get_user_info` to isolate the logic.
+⚠️ Risk:
+By failing to strictly filter incoming JSON data before storage, the application was vulnerable to Mass Assignment and abusive storage attacks. An attacker could inject enormous, arbitrary, or malicious JSON blobs into the database alongside valid data. This could lead to resource exhaustion (database bloat), denial of service, or potentially exploit downstream parsers/consumers that read the `shared_briefings` data.
 
-📊 **Coverage:**
-- Tested the scenario where a user is logged in (mocked `get_user_info` returns a populated user dictionary), validating the JSON response contains `logged_in: True` and the `user` data.
-- Tested the scenario where a user is logged out (mocked `get_user_info` returns `None`), validating the JSON response contains `logged_in: False` and lacks user data.
-
-✨ **Result:**
-Increased test coverage by ensuring the authentication check endpoint correctly maps the application's internal state to the corresponding JSON API response, catching potential regressions in API responses.
+🛡️ Solution:
+Updated `share_briefing()` in `main.py` to extract only the specific keys required for the feature (`story_groups` and `remaining_stories`) into a new dictionary. Any other injected keys in the request payload are safely discarded before being serialized to JSON and inserted into PostgreSQL. Added comprehensive unit tests in `test_share_briefing.py` and `test_shared_briefing.py` to verify the isolation and safety of the endpoint.
