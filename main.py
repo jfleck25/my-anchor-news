@@ -638,7 +638,7 @@ def oauth2callback():
 @app.route('/logout')
 def logout():
     session.clear()
-    return jsonify({'status': 'logged_out'})
+    return redirect('/?logout=true')
 
 @app.route('/api/check_auth')
 def check_auth():

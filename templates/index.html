@@ -435,6 +435,22 @@
             </div>
         );
 
+        const LogoutPage = () => (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-brand-50/20 to-slate-50 dark:from-slate-900 dark:via-brand-900/10 dark:to-slate-900 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
+                <div className="z-10 w-full max-w-md p-8 animate-[fadeIn_0.5s_ease-out] text-center">
+                    <div className="w-16 h-16 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto flex items-center justify-center mb-6 text-green-500">
+                        <Icons.Check />
+                    </div>
+                    <h1 className="text-4xl font-serif font-bold text-slate-900 dark:text-white mb-3">Logged Out</h1>
+                    <p className="text-slate-500 dark:text-slate-400 text-lg mb-8">You have been successfully logged out.</p>
+                    <a href="/" className="inline-flex items-center justify-center py-3.5 px-6 border border-transparent rounded-xl text-white bg-brand-600 hover:bg-brand-700 font-medium transition-colors">
+                        Return Home
+                    </a>
+                </div>
+            </div>
+        );
+
         const LoadingState = ({ text }) => (
             <div className="flex flex-col items-center justify-center py-20 animate-pulse">
                 <div className="w-16 h-16 bg-slate-200 dark:bg-slate-700 rounded-full mb-4 relative">
@@ -607,6 +623,7 @@
                     const fetchSettings = async () => {
                         try {
                             const res = await fetch(`${backendUrl}/api/settings`, { credentials: 'include' });
+                            if (res.status === 401) { window.location.href = '/login'; return; }
                             if (res.ok) setSettings(await res.json());
                         } catch (e) { console.error("Settings fetch error:", e); }
                     };
@@ -657,6 +674,7 @@
                 const startTime = Date.now();
                 try {
                     const res = await fetch(`${backendUrl}/api/fetch_emails`, { credentials: 'include' });
+                    if (res.status === 401) { window.location.href = '/login'; return; }
                     if (!res.ok) {
                         const errorData = await res.json().catch(() => ({}));
                         const errorMsg = errorData.error ||
@@ -686,6 +704,7 @@
                     })
                         .then(async (audioRes) => {
                             if (prefetchId !== prefetchIdRef.current) return;
+                            if (audioRes.status === 401) { window.location.href = '/login'; return; }
                             if (audioRes.ok) {
                                 const audioData = await audioRes.json();
                                 setPreloadedAudio(audioData.audio_content);
@@ -748,6 +767,7 @@
                         body: JSON.stringify(analysis),
                         credentials: 'include'
                     });
+                    if (res.status === 401) { window.location.href = '/login'; return; }
                     if (!res.ok) {
                         const errorData = await res.json().catch(() => ({}));
                         const errorMsg = errorData.error ||
@@ -1423,6 +1443,8 @@
 
             const mainContent = sharedData ? (
                 <Dashboard userInfo={null} sharedData={sharedData} />
+            ) : new URLSearchParams(window.location.search).get('logout') === 'true' ? (
+                <LogoutPage />
             ) : !isLoggedIn ? (
                 <LoginPage />
             ) : (
