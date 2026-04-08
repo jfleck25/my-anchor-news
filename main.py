@@ -26,6 +26,7 @@ from google.api_core import client_options
 from google.api_core.exceptions import ResourceExhausted, InvalidArgument
 from bs4 import BeautifulSoup
 from google.auth.transport.requests import Request, AuthorizedSession
+import google.auth.transport.requests 
 from werkzeug.middleware.proxy_fix import ProxyFix
 import psycopg2 
 import psycopg2.pool
@@ -250,7 +251,7 @@ def get_user_info():
         credentials = get_credentials_from_session(session['credentials'])
         # ⚡ Bolt: Use AuthorizedSession for direct REST call to avoid discovery document overhead
         authed_session = AuthorizedSession(credentials)
-        response = authed_session.get('https://www.googleapis.com/oauth2/v2/userinfo')
+        response = authed_session.get('https://www.googleapis.com/oauth2/v2/userinfo', timeout=5)
         response.raise_for_status()
         user_info = response.json()
         session['user_info'] = user_info
