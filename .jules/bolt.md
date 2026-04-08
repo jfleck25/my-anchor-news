@@ -1,3 +1,7 @@
 ## 2024-04-07 - Avoid Google API Discovery Document for Simple Calls
 **Learning:** Initializing a Google API service via `googleapiclient.discovery.build()` introduces substantial network latency because it fetches and parses the API's discovery document before making the actual request. This is particularly problematic for simple REST operations like fetching user info during authentication checks.
 **Action:** Replace `build('oauth2', 'v2')` with direct REST API requests using `google.auth.transport.requests.AuthorizedSession(credentials)` for simple operations. This avoids the discovery overhead while preserving automatic OAuth2 token refreshment.
+
+## $(date +%Y-%m-%d) - String Builder Pattern for Large Iterative Appends
+**Learning:** Python string concatenation `+=` creates a new string object on every operation, leading to O(N^2) memory and time overhead, especially when aggregating large outputs like email content.
+**Action:** Always replace iterative string concatenation with list `.append()` and a final `"".join()`.
