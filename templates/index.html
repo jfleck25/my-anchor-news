@@ -237,10 +237,24 @@
             };
 
             const handleSave = () => {
+                let finalSources = [...sources];
+                if (newSource && !finalSources.includes(newSource)) {
+                    finalSources.push(newSource);
+                    setSources(finalSources);
+                    setNewSource("");
+                }
+
+                let finalKeywords = [...keywords];
+                if (newKeyword && !finalKeywords.includes(newKeyword)) {
+                    finalKeywords.push(newKeyword);
+                    setKeywords(finalKeywords);
+                    setNewKeyword("");
+                }
+
                 onSave({ 
-                    sources, 
+                    sources: finalSources,
                     priority_sources: prioritySources,
-                    keywords,
+                    keywords: finalKeywords,
                     time_window_hours: parseInt(timeWindow),
                     personality
                 });
