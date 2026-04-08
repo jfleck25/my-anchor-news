@@ -9,7 +9,10 @@ sys.modules['google'] = google
 google_auth = types.ModuleType('google.auth')
 sys.modules['google.auth'] = google_auth
 sys.modules['google.auth.transport'] = types.ModuleType('google.auth.transport')
-sys.modules['google.auth.transport.requests'] = types.ModuleType('google.auth.transport.requests')
+mock_requests = types.ModuleType('google.auth.transport.requests')
+mock_requests.Request = MagicMock()
+mock_requests.AuthorizedSession = MagicMock()
+sys.modules['google.auth.transport.requests'] = mock_requests
 
 google_oauth2 = types.ModuleType('google.oauth2')
 sys.modules['google.oauth2'] = google_oauth2
@@ -35,6 +38,7 @@ sys.modules['google.cloud.texttospeech'] = mock_texttospeech
 sys.modules['google.api_core'] = types.ModuleType('google.api_core')
 mock_client_options = MagicMock()
 sys.modules['google.api_core.client_options'] = mock_client_options
+sys.modules['google.api_core.exceptions'] = MagicMock()
 
 mock_genai = MagicMock()
 sys.modules['google.generativeai'] = mock_genai
