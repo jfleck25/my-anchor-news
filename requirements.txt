@@ -10,7 +10,7 @@ gunicorn
 werkzeug>=3.0.6
 protobuf>=5.29.6
 urllib3>=2.6.3
-requests>=2.32.4
+requests>=2.33.0
 zipp>=3.19.1
 psycopg2-binary
 pyasn1>=0.6.3
