@@ -853,11 +853,9 @@ def share_briefing():
     if not ('story_groups' in data or 'remaining_stories' in data):
         return jsonify({'error': 'Invalid data content. Required fields missing.'}), 400
 
-    sanitized_data = {}
-    if 'story_groups' in data:
-        sanitized_data['story_groups'] = data['story_groups']
-    if 'remaining_stories' in data:
-        sanitized_data['remaining_stories'] = data['remaining_stories']
+    allowed_keys = {'story_groups', 'remaining_stories'}
+    validated_data = {k: data[k] for k in allowed_keys if k in data}
+    data = validated_data
 
     share_id = str(uuid.uuid4())
     if DATABASE_URL:

@@ -23,6 +23,10 @@
 **Vulnerability:** The frontend application manually concatenated unescaped JSON properties from an LLM response (based on email contents) into an HTML string for PDF generation, which was then loaded into a new window.
 **Learning:** Even when the data displayed in the UI is safely rendered (e.g., by React), secondary outputs like printable PDFs or exported documents constructed via manual string concatenation (`html += ...`) bypass these safety mechanisms. When the data originates from an LLM processing untrusted external input (like emails), this creates a severe XSS vector where prompt injection can lead to script execution in the context of the application's origin (via `window.open`).
 **Prevention:** Always sanitize or HTML-escape dynamic data before concatenating it into raw HTML strings, regardless of whether the primary UI rendering mechanism is considered safe. Do not trust LLM output to be benign, especially when it digests arbitrary external data.
+## 2024-04-07 - Insufficient Data Validation in Share Endpoint
+**Vulnerability:** The `/api/share` endpoint accepted arbitrarily large or malicious JSON dictionaries containing unvalidated keys and inserted them directly into PostgreSQL. This could lead to database bloat or unexpected downstream parsing issues.
+**Learning:** Checking for the presence of required keys is not the same as ensuring *only* those keys are present. An attacker can append extra arbitrary data if the input is not strictly filtered.
+**Prevention:** Always validate and filter user-provided JSON structures to an explicit allowlist of known keys before serialization and storage.
 
 ## 2025-04-06 - Insufficient Data Validation in Share Endpoint
 
