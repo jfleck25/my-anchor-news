@@ -392,7 +392,7 @@ def analyze_news_with_llm(newsletters_text):
     if not model: raise Exception("Gemini API model is not configured.")
     
     # Pre-validation check
-    if len(newsletters_text) > 150000:
+    if len(newsletters_text) > 800000:
         return {"error": "Too much newsletter content to process at once. Please reduce your lookback window in settings."}
 
     prompt = """
