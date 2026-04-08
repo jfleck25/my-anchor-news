@@ -23,6 +23,10 @@
 **Vulnerability:** The frontend application manually concatenated unescaped JSON properties from an LLM response (based on email contents) into an HTML string for PDF generation, which was then loaded into a new window.
 **Learning:** Even when the data displayed in the UI is safely rendered (e.g., by React), secondary outputs like printable PDFs or exported documents constructed via manual string concatenation (`html += ...`) bypass these safety mechanisms. When the data originates from an LLM processing untrusted external input (like emails), this creates a severe XSS vector where prompt injection can lead to script execution in the context of the application's origin (via `window.open`).
 **Prevention:** Always sanitize or HTML-escape dynamic data before concatenating it into raw HTML strings, regardless of whether the primary UI rendering mechanism is considered safe. Do not trust LLM output to be benign, especially when it digests arbitrary external data.
+## 2024-04-07 - Insufficient Data Validation in Share Endpoint
+**Vulnerability:** The `/api/share` endpoint accepted arbitrarily large or malicious JSON dictionaries containing unvalidated keys and inserted them directly into PostgreSQL. This could lead to database bloat or unexpected downstream parsing issues.
+**Learning:** Checking for the presence of required keys is not the same as ensuring *only* those keys are present. An attacker can append extra arbitrary data if the input is not strictly filtered.
+**Prevention:** Always validate and filter user-provided JSON structures to an explicit allowlist of known keys before serialization and storage.
 
 ## 2025-04-06 - Insufficient Data Validation in Share Endpoint
 
@@ -39,3 +43,8 @@
 **Learning:** When APIs accept JSON data for update operations, directly saving the entire raw payload exposes the application to mass assignment. Attackers could bloat the database, overwrite unintended fields, or store configurations outside expected parameters.
 
 **Prevention:** To prevent mass assignment, always enforce a strict schema on incoming JSON payloads. Before saving or processing updates, explicitly extract only the allowed, expected keys into a new, sanitized dictionary rather than trusting the raw user input.
+## 2025-04-06 - Cross-Tenant Data Leak in Ephemeral Cache
+
+**Vulnerability:** The application used an ephemeral, file-based cache (`cache.json`) to store generated email briefings (`cache['analysis']`) and synthesized audio (`cache['audio']`). However, the cache was global and only keyed by the user's `settings_hash` and the audio's `script_hash`. If two distinct users shared the same settings configuration (e.g., the default settings), a subsequent user could hit the cache and receive the private, sensitive email analysis or generated audio of the previous user.
+**Learning:** Storing private data in a global cache that is only keyed by configuration parameters (like settings hashes) instead of explicit user identifiers creates a severe Cross-Tenant Data Leak (Information Disclosure) vulnerability.
+**Prevention:** Always partition or scope cached data using a strong, unique user identifier (e.g., `user_id` or `email`) to ensure that one tenant's sensitive information is completely isolated and inaccessible to another, even if they share identical application states or configurations.

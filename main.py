@@ -35,6 +35,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
+from posthog import Posthog
 
 # --- Sentry Configuration ---
 # Get Sentry DSN from environment variable
@@ -51,6 +52,13 @@ if SENTRY_DSN:
     print(" * Sentry error tracking enabled")
 else:
     print(" * Sentry DSN not found - error tracking disabled (set SENTRY_DSN environment variable)")
+
+# --- PostHog Configuration ---
+POSTHOG_API_KEY = os.environ.get("POSTHOG_API_KEY")
+if POSTHOG_API_KEY:
+    posthog_client = Posthog(project_api_key=POSTHOG_API_KEY, host=os.environ.get("POSTHOG_HOST", "https://us.i.posthog.com"))
+else:
+    posthog_client = None
 
 # --- Configuration & Constants ---
 app = flask.Flask(__name__)
@@ -216,6 +224,13 @@ def init_db():
 init_db()
 
 # --- Helper Functions ---
+
+def anonymize_user(email):
+    if not email:
+        return 'anonymous'
+    # Use app instance secret_key for a consistent but secure salt across sessions if it persists, or fallback to something secure
+    salt = str(app.secret_key or "default_salt")
+    return hashlib.sha256((email + salt).encode()).hexdigest()
 
 
 def get_credentials_from_session(creds_data):
@@ -693,11 +708,13 @@ def fetch_emails():
     if email: session['user_email'] = email
     settings = load_settings(email)
 
+    cache_key = email or str(user_info.get('id', 'unknown')) if user_info else 'unknown'
     current_hash = get_settings_hash(settings)
     with _cache_lock:
         cache = load_cache()
-        if (cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (cache.get('settings_hash') == current_hash) and (cache.get('analysis')):
-            return jsonify(cache['analysis'])
+        user_cache = cache.get(cache_key, {})
+        if (user_cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (user_cache.get('settings_hash') == current_hash) and (user_cache.get('analysis')):
+            return jsonify(user_cache['analysis'])
 
     creds_data = session.get('credentials')
     if not creds_data:
@@ -739,23 +756,54 @@ def fetch_emails():
             reason = "No text found matching your watchlist." if keywords else "No text found."
             return jsonify({'story_groups': [], 'remaining_stories': [{'headline': reason}]})
 
+        raw_length = sum(len(msg_str) for msg_str in normal_text_parts + priority_text_parts)
+        optimized_length = len(consolidated_text)
+        newsletter_count = len(normal_text_parts) + (len(priority_text_parts) // 2) # priority adds 2 parts per message (wait, let's just use number of fetched parts)
+        newsletter_count = len(messages) # We can approximate by checking how many were requested 
+
+        t_start = time.time()
         analysis_result = analyze_news_with_llm(consolidated_text)
+        t_duration_ms = int((time.time() - t_start) * 1000)
+
+        if posthog_client and email:
+            anon_id = anonymize_user(email)
+            if analysis_result.get('error'):
+                posthog_client.capture(anon_id, 'llm_generation_error', {
+                    'error_msg': analysis_result.get('error'),
+                    'llm_generation_time_ms': t_duration_ms
+                })
+            else:
+                posthog_client.capture(anon_id, 'emails_fetched', {
+                    'newsletter_count': newsletter_count,
+                    'raw_html_length': raw_length,
+                    'optimized_text_length': optimized_length,
+                    'llm_generation_time_ms': t_duration_ms,
+                    'output_text_length': len(json.dumps(analysis_result)),
+                    'time_window_hours': hours
+                })
+
         if analysis_result.get('error'):
             return jsonify(analysis_result), 503
 
         with _cache_lock:
             cache = load_cache()
-            cache['timestamp'] = time.time()
-            cache['settings_hash'] = current_hash
-            cache['analysis'] = analysis_result
-            if 'audio' in cache:
-                del cache['audio']
-            if 'script_hash' in cache:
-                del cache['script_hash']
+            user_cache = cache.get(cache_key, {})
+            user_cache['timestamp'] = time.time()
+            user_cache['settings_hash'] = current_hash
+            user_cache['analysis'] = analysis_result
+            if 'audio' in user_cache:
+                del user_cache['audio']
+            if 'script_hash' in user_cache:
+                del user_cache['script_hash']
+            cache[cache_key] = user_cache
             save_cache(cache)
         return jsonify(analysis_result)
     except Exception as e:
         err_msg = str(e).lower()
+        
+        if posthog_client and email:
+             posthog_client.capture(anonymize_user(email), 'fetch_email_error', {'error': err_msg})
+
         if 'quota' in err_msg or 'rate' in err_msg or '429' in err_msg:
             return jsonify({'error': "Gmail rate limit reached. Please try again in a few minutes."}), 429
         if 'credentials' in err_msg or 'token' in err_msg or '401' in err_msg:
@@ -774,6 +822,7 @@ def generate_audio():
         return jsonify({'error': 'Your session expired. Please log in again.'}), 401
 
     email = user_info.get('email') if user_info else None
+    cache_key = email or str(user_info.get('id', 'unknown')) if user_info else 'unknown'
     settings = load_settings(email)
     style = settings.get('personality', 'anchor')
 
@@ -800,8 +849,9 @@ def generate_audio():
         script_hash = hashlib.md5((script_text + style).encode()).hexdigest()
         with _cache_lock:
             cache = load_cache()
-            if cache.get('script_hash') == script_hash and cache.get('audio'):
-                return jsonify({"audio_content": cache['audio']})
+            user_cache = cache.get(cache_key, {})
+            if user_cache.get('script_hash') == script_hash and user_cache.get('audio'):
+                return jsonify({"audio_content": user_cache['audio']})
 
         sentences = re.split(r'(?<=[.!?])\s+', script_text)
         chunks = []
@@ -818,14 +868,26 @@ def generate_audio():
             chunks.append(current_chunk)
 
         worker_args = [(i, chunk_text, creds_dict, style, PROJECT_ID) for i, chunk_text in enumerate(chunks)]
+        t_start = time.time()
         with ThreadPoolExecutor(max_workers=min(len(chunks), 8)) as executor:
             results = list(executor.map(_synthesize_one_chunk, worker_args))
         all_audio_content = b"".join(audio for _idx, audio in results)
+        tts_duration_ms = int((time.time() - t_start) * 1000)
+
         audio_base64 = base64.b64encode(all_audio_content).decode('utf-8')
+        
+        if posthog_client and email:
+            posthog_client.capture(anonymize_user(email), 'audio_generated', {
+                'tts_generation_time_ms': tts_duration_ms,
+                'persona_selected': style
+            })
+
         with _cache_lock:
             cache = load_cache()
-            cache['script_hash'] = script_hash
-            cache['audio'] = audio_base64
+            user_cache = cache.get(cache_key, {})
+            user_cache['script_hash'] = script_hash
+            user_cache['audio'] = audio_base64
+            cache[cache_key] = user_cache
             save_cache(cache)
         return jsonify({"audio_content": audio_base64})
     except Exception as e:
@@ -847,11 +909,9 @@ def share_briefing():
     if not ('story_groups' in data or 'remaining_stories' in data):
         return jsonify({'error': 'Invalid data content. Required fields missing.'}), 400
 
-    sanitized_data = {}
-    if 'story_groups' in data:
-        sanitized_data['story_groups'] = data['story_groups']
-    if 'remaining_stories' in data:
-        sanitized_data['remaining_stories'] = data['remaining_stories']
+    allowed_keys = {'story_groups', 'remaining_stories'}
+    validated_data = {k: data[k] for k in allowed_keys if k in data}
+    data = validated_data
 
     share_id = str(uuid.uuid4())
     if DATABASE_URL:
