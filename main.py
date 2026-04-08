@@ -692,11 +692,13 @@ def fetch_emails():
     if email: session['user_email'] = email
     settings = load_settings(email)
 
+    cache_key = email or str(user_info.get('id', 'unknown')) if user_info else 'unknown'
     current_hash = get_settings_hash(settings)
     with _cache_lock:
         cache = load_cache()
-        if (cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (cache.get('settings_hash') == current_hash) and (cache.get('analysis')):
-            return jsonify(cache['analysis'])
+        user_cache = cache.get(cache_key, {})
+        if (user_cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (user_cache.get('settings_hash') == current_hash) and (user_cache.get('analysis')):
+            return jsonify(user_cache['analysis'])
 
     creds_data = session.get('credentials')
     if not creds_data:
@@ -743,13 +745,15 @@ def fetch_emails():
 
         with _cache_lock:
             cache = load_cache()
-            cache['timestamp'] = time.time()
-            cache['settings_hash'] = current_hash
-            cache['analysis'] = analysis_result
-            if 'audio' in cache:
-                del cache['audio']
-            if 'script_hash' in cache:
-                del cache['script_hash']
+            user_cache = cache.get(cache_key, {})
+            user_cache['timestamp'] = time.time()
+            user_cache['settings_hash'] = current_hash
+            user_cache['analysis'] = analysis_result
+            if 'audio' in user_cache:
+                del user_cache['audio']
+            if 'script_hash' in user_cache:
+                del user_cache['script_hash']
+            cache[cache_key] = user_cache
             save_cache(cache)
         return jsonify(analysis_result)
     except Exception as e:
@@ -772,6 +776,7 @@ def generate_audio():
         return jsonify({'error': 'Your session expired. Please log in again.'}), 401
 
     email = user_info.get('email') if user_info else None
+    cache_key = email or str(user_info.get('id', 'unknown')) if user_info else 'unknown'
     settings = load_settings(email)
     style = settings.get('personality', 'anchor')
 
@@ -798,8 +803,9 @@ def generate_audio():
         script_hash = hashlib.md5((script_text + style).encode()).hexdigest()
         with _cache_lock:
             cache = load_cache()
-            if cache.get('script_hash') == script_hash and cache.get('audio'):
-                return jsonify({"audio_content": cache['audio']})
+            user_cache = cache.get(cache_key, {})
+            if user_cache.get('script_hash') == script_hash and user_cache.get('audio'):
+                return jsonify({"audio_content": user_cache['audio']})
 
         sentences = re.split(r'(?<=[.!?])\s+', script_text)
         chunks = []
@@ -822,8 +828,10 @@ def generate_audio():
         audio_base64 = base64.b64encode(all_audio_content).decode('utf-8')
         with _cache_lock:
             cache = load_cache()
-            cache['script_hash'] = script_hash
-            cache['audio'] = audio_base64
+            user_cache = cache.get(cache_key, {})
+            user_cache['script_hash'] = script_hash
+            user_cache['audio'] = audio_base64
+            cache[cache_key] = user_cache
             save_cache(cache)
         return jsonify({"audio_content": audio_base64})
     except Exception as e:

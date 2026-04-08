@@ -39,3 +39,8 @@
 **Learning:** When APIs accept JSON data for update operations, directly saving the entire raw payload exposes the application to mass assignment. Attackers could bloat the database, overwrite unintended fields, or store configurations outside expected parameters.
 
 **Prevention:** To prevent mass assignment, always enforce a strict schema on incoming JSON payloads. Before saving or processing updates, explicitly extract only the allowed, expected keys into a new, sanitized dictionary rather than trusting the raw user input.
+## 2025-04-06 - Cross-Tenant Data Leak in Ephemeral Cache
+
+**Vulnerability:** The application used an ephemeral, file-based cache (`cache.json`) to store generated email briefings (`cache['analysis']`) and synthesized audio (`cache['audio']`). However, the cache was global and only keyed by the user's `settings_hash` and the audio's `script_hash`. If two distinct users shared the same settings configuration (e.g., the default settings), a subsequent user could hit the cache and receive the private, sensitive email analysis or generated audio of the previous user.
+**Learning:** Storing private data in a global cache that is only keyed by configuration parameters (like settings hashes) instead of explicit user identifiers creates a severe Cross-Tenant Data Leak (Information Disclosure) vulnerability.
+**Prevention:** Always partition or scope cached data using a strong, unique user identifier (e.g., `user_id` or `email`) to ensure that one tenant's sensitive information is completely isolated and inaccessible to another, even if they share identical application states or configurations.

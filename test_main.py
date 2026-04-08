@@ -3,8 +3,11 @@ import sys
 from unittest.mock import MagicMock
 
 # Mock out heavy external dependencies before importing main
+
 sys.modules['google'] = MagicMock()
 sys.modules['google.api_core'] = MagicMock()
+sys.modules['google.api_core.exceptions'] = MagicMock()
+sys.modules['google.api_core.client_options'] = MagicMock()
 sys.modules['google.generativeai'] = MagicMock()
 sys.modules['google.oauth2'] = MagicMock()
 sys.modules['google.oauth2.credentials'] = MagicMock()
