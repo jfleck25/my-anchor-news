@@ -723,18 +723,19 @@ def fetch_emails():
             return jsonify({'story_groups': [], 'remaining_stories': [{'headline': f'No newsletters found in last {hours}h.'}]})
 
         worker_args = [(i, msg['id'], creds_dict, keywords, priority_sources) for i, msg in enumerate(messages)]
-        priority_text = ""
-        normal_text = ""
+        # ⚡ Bolt: Use string builder pattern (.append then .join) instead of += to avoid O(N^2) memory overhead
+        priority_text_parts = []
+        normal_text_parts = []
         with ThreadPoolExecutor(max_workers=10) as executor:
             for _index, email_block, is_priority in executor.map(_fetch_one_message, worker_args):
                 if email_block is None:
                     continue
                 if is_priority:
-                    priority_text += f"*** PRIORITY SOURCE ***\n{email_block}"
+                    priority_text_parts.append(f"*** PRIORITY SOURCE ***\n{email_block}")
                 else:
-                    normal_text += email_block
+                    normal_text_parts.append(email_block)
 
-        consolidated_text = priority_text + normal_text
+        consolidated_text = "".join(priority_text_parts) + "".join(normal_text_parts)
         if not consolidated_text:
             reason = "No text found matching your watchlist." if keywords else "No text found."
             return jsonify({'story_groups': [], 'remaining_stories': [{'headline': reason}]})
