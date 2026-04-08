@@ -699,7 +699,7 @@
                     fetch(`${backendUrl}/api/generate_audio`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(data),
+                        body: JSON.stringify({ ...data, greeting: new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening' }),
                         credentials: 'include'
                     })
                         .then(async (audioRes) => {
@@ -764,7 +764,7 @@
                     const res = await fetch(`${backendUrl}/api/generate_audio`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(analysis),
+                        body: JSON.stringify({ ...analysis, greeting: new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening' }),
                         credentials: 'include'
                     });
                     if (res.status === 401) { window.location.href = '/login'; return; }

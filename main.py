@@ -384,7 +384,16 @@ def optimize_newsletter_for_llm(html_content: str, max_chars: int = 15000) -> st
 
 def generate_script_from_analysis(analysis_json, style="anchor"):
     persona = PERSONAS.get(style, PERSONAS["anchor"])
-    script_parts = [f"{random.choice(persona['intro'])} "]
+    greeting = analysis_json.get('greeting')
+    chosen_intro = random.choice(persona['intro'])
+    
+    if greeting:
+        if "Good morning" in chosen_intro:
+            chosen_intro = chosen_intro.replace("Good morning", greeting)
+        elif "Rise and shine!" in chosen_intro and "morning" not in greeting.lower():
+            chosen_intro = chosen_intro.replace("Rise and shine!", greeting + "!")
+            
+    script_parts = [f"{chosen_intro} "]
     
     story_groups = analysis_json.get('story_groups', [])
     for i, group in enumerate(story_groups):
