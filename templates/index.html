@@ -565,6 +565,7 @@
             const [isSharing, setIsSharing] = React.useState(false);
             const [shareUrl, setShareUrl] = React.useState(null);
             const [copySuccess, setCopySuccess] = React.useState(false);
+            const [copyErrorSuccess, setCopyErrorSuccess] = React.useState(false);
             const [playbackRate, setPlaybackRate] = React.useState(1.0);
             const [error, setError] = React.useState(null);
             const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
@@ -1245,8 +1246,9 @@
                                 <p className="flex-1 min-w-0">{error}</p>
                                 <div className="flex items-center gap-2 shrink-0">
                                     <button onClick={() => { setError(null); handleFetchAndAnalyze(); }} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500" aria-label="Retry">Retry</button>
-                                    <button onClick={() => { try { navigator.clipboard.writeText(error); } catch (e) {} }} className="p-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" title="Copy error" aria-label="Copy error to clipboard">
-                                        <Icons.Copy />
+                                    <button onClick={() => { try { navigator.clipboard.writeText(error).then(() => { setCopyErrorSuccess(true); setTimeout(() => setCopyErrorSuccess(false), 3000); }); } catch (e) {} }} className="p-2 relative text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" title="Copy error" aria-label="Copy error to clipboard">
+                                        {copyErrorSuccess ? <Icons.Check /> : <Icons.Copy />}
+                                        {copyErrorSuccess && <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs py-1 px-2 rounded opacity-100 transition-opacity whitespace-nowrap">Copied!</span>}
                                     </button>
                                 </div>
                             </div>
