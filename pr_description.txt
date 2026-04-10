@@ -1,13 +1,14 @@
-🎯 **What:**
-Fixed a code health issue where `pool` was imported but unused in `main.py` (Flake8 F401 warning).
+## 💡 What
+- Added standard ARIA accessibility attributes (`role="dialog"`, `aria-modal="true"`, `aria-labelledby`) to the Settings Modal.
+- Added visual loading feedback (a spinning `Icons.Refresh` icon) to the top-bar "Refresh" and "Play Briefing" action buttons when data or audio is being generated.
 
-💡 **Why:**
-The line `from psycopg2 import pool` imported `pool` into the global namespace but it was never used directly. Instead, `psycopg2.pool.ThreadedConnectionPool` was used. While this syntax implicitly made the `psycopg2.pool` submodule available, it triggered linter warnings for an unused import.
-Replaced `from psycopg2 import pool` with `import psycopg2.pool`, making the required submodule available for `ThreadedConnectionPool` while correctly silencing the unused import warning. Also explicitly mocked `psycopg2.pool` in `test_main.py` since it's an explicit top-level import now.
+## 🎯 Why
+- **Accessibility:** Screen reader users previously had less context when the Settings Modal was active, as it lacked the appropriate ARIA dialog properties and label associations. Adding `aria-modal="true"` ensures assistive technologies recognize the focus trap constraint, and `aria-labelledby` provides a distinct, descriptive title.
+- **Usability:** Users interacting with the top-bar actions to refresh their email feed or trigger audio synthesis had no immediate visual indication that a long-running asynchronous task was in progress, risking double-clicks or confusion. Providing a spinner aligns with standard UI feedback patterns and existing empty-state behaviors.
 
-✅ **Verification:**
-- Ran `flake8 main.py` and confirmed that the F401 unused import warning has been resolved.
-- Ran tests suite for tests importing `main.py` with mock, and verified that Pytest collections run successfully.
+## 📸 Before/After
+*(No visual changes to the default resting state, but a spinner now appears on buttons during click-activated asynchronous calls).*
 
-✨ **Result:**
-Cleaner code that adheres to flake8 style guidelines without triggering spurious unused import warnings or breaking the database connection pool logic.
+## ♿ Accessibility
+- Added `id="settings-modal-title"` to the `SettingsModal` heading.
+- Added `role="dialog"`, `aria-modal="true"`, and `aria-labelledby="settings-modal-title"` to the `<div ref={modalRef}>` interior container.
