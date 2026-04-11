@@ -862,19 +862,26 @@ def generate_audio():
             if user_cache.get('script_hash') == script_hash and user_cache.get('audio'):
                 return jsonify({"audio_content": user_cache['audio']})
 
+        # ⚡ Bolt: Optimize chunk building by tracking bytes incrementally and using string builder pattern
+        # to avoid O(N^2) memory allocations and redundant utf-8 encoding operations in the loop.
         sentences = re.split(r'(?<=[.!?])\s+', script_text)
         chunks = []
-        current_chunk = ""
+        current_chunk_parts = []
+        current_chunk_len = 0
         byte_limit = 4800
         for sentence in sentences:
-            if len(current_chunk.encode('utf-8')) + len(sentence.encode('utf-8')) + 1 < byte_limit:
-                current_chunk += sentence + " "
+            sentence_text = sentence + " "
+            sentence_bytes = len(sentence_text.encode('utf-8'))
+            if current_chunk_len + sentence_bytes < byte_limit:
+                current_chunk_parts.append(sentence_text)
+                current_chunk_len += sentence_bytes
             else:
-                if current_chunk:
-                    chunks.append(current_chunk)
-                current_chunk = sentence + " "
-        if current_chunk:
-            chunks.append(current_chunk)
+                if current_chunk_parts:
+                    chunks.append("".join(current_chunk_parts))
+                current_chunk_parts = [sentence_text]
+                current_chunk_len = sentence_bytes
+        if current_chunk_parts:
+            chunks.append("".join(current_chunk_parts))
 
         worker_args = [(i, chunk_text, creds_dict, style, PROJECT_ID) for i, chunk_text in enumerate(chunks)]
         t_start = time.time()
