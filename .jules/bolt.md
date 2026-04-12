@@ -9,3 +9,7 @@
 ## 2024-05-19 - Use string builder pattern for building large texts in a loop
 **Learning:** Using `+=` for string concatenation in a loop over many strings creates a new string object and copies the memory every iteration, resulting in O(N^2) time complexity. Using an array and calling `.append()` each iteration, then `"".join(array)` at the end reduces this to O(N) operations and gives significant speedups.
 **Action:** Whenever generating strings in a loop by accumulating parts, always use the `.append()` and `"".join()` pattern to prevent O(N^2) memory and execution overhead.
+
+## 2025-04-12 - Avoid repeated UTF-8 encoding of growing strings in chunking loops
+**Learning:** Re-encoding the entire `current_chunk` to UTF-8 on every iteration of a sentence-chunking loop results in quadratic O(N^2) time complexity, because the length of `current_chunk` keeps growing. Furthermore, using `+=` to append string chunks creates memory reallocations.
+**Action:** When building chunks up to a byte limit, track the accumulated byte length incrementally using a simple counter (e.g., `current_chunk_bytes += len(sentence.encode('utf-8')) + 1`), and use the string builder pattern (`.append()` + `"".join()`) instead of repeated encodings and string concatenations.
