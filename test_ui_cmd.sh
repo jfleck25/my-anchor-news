@@ -1,0 +1,1 @@
+python3 -c "import sys, unittest; from unittest.mock import MagicMock; [sys.modules.setdefault(k, MagicMock()) for k in ['google', 'psycopg2', 'playwright', 'playwright.sync_api']]; unittest.main(module=None, argv=['unittest', 'discover', '-s', 'tests', '-p', 'test_ui.py'])"
