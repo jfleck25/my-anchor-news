@@ -9,3 +9,7 @@
 ## 2024-05-19 - Use string builder pattern for building large texts in a loop
 **Learning:** Using `+=` for string concatenation in a loop over many strings creates a new string object and copies the memory every iteration, resulting in O(N^2) time complexity. Using an array and calling `.append()` each iteration, then `"".join(array)` at the end reduces this to O(N) operations and gives significant speedups.
 **Action:** Whenever generating strings in a loop by accumulating parts, always use the `.append()` and `"".join()` pattern to prevent O(N^2) memory and execution overhead.
+
+## 2024-03-08 - O(N²) Performance Trap with Python String Concatenation & Encoding Loops
+**Learning:** In the text-to-speech chunker (`generate_audio`), building strings via concatenation (`current_chunk += sentence`) and dynamically evaluating byte lengths using `.encode('utf-8')` within a loop causes O(N²) overhead. As the `current_chunk` grows, the encoding process repeatedly serializes the entire accumulated string for every newly added sentence.
+**Action:** When tracking the byte size of a dynamically growing string, use a list of string parts (string builder pattern: `.append()` then `"".join()`) and maintain a separate running counter of the current length (`current_chunk_len += len(new_part.encode('utf-8'))`). This reduces algorithmic overhead from O(N²) to O(N).
