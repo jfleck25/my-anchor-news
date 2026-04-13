@@ -48,3 +48,8 @@
 **Vulnerability:** The application used an ephemeral, file-based cache (`cache.json`) to store generated email briefings (`cache['analysis']`) and synthesized audio (`cache['audio']`). However, the cache was global and only keyed by the user's `settings_hash` and the audio's `script_hash`. If two distinct users shared the same settings configuration (e.g., the default settings), a subsequent user could hit the cache and receive the private, sensitive email analysis or generated audio of the previous user.
 **Learning:** Storing private data in a global cache that is only keyed by configuration parameters (like settings hashes) instead of explicit user identifiers creates a severe Cross-Tenant Data Leak (Information Disclosure) vulnerability.
 **Prevention:** Always partition or scope cached data using a strong, unique user identifier (e.g., `user_id` or `email`) to ensure that one tenant's sensitive information is completely isolated and inaccessible to another, even if they share identical application states or configurations.
+
+## 2024-06-06 - Denial of Service via Missing Payload Limit
+**Vulnerability:** The application accepted unconstrained incoming JSON payloads without imposing a `MAX_CONTENT_LENGTH` on the Flask configuration.
+**Learning:** Without setting a global upper bound on request content length, attackers can submit excessively large payloads to endpoints like `/api/share` or `/api/settings` causing resource exhaustion, memory out-of-bounds, and application unavailability (Denial of Service).
+**Prevention:** Always configure `app.config['MAX_CONTENT_LENGTH']` in Flask to limit incoming request sizes according to acceptable use cases (e.g., 2MB).

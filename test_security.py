@@ -63,6 +63,7 @@ sys.modules.update({
     'sentry_sdk': MagicMock(),
     'sentry_sdk.integrations.flask': MagicMock(),
     'bs4': MagicMock(),
+    'posthog': MagicMock(),
 })
 
 import main
@@ -93,6 +94,22 @@ class TestSecurityFix(unittest.TestCase):
         kwargs = main.Credentials.call_args[1]
         self.assertEqual(kwargs['client_secret'], 'super_secret')
         self.assertEqual(kwargs['token'], 'test_token')
+
+    def test_global_payload_size_limit(self):
+        """Test that requests exceeding the 2MB limit are rejected."""
+        # Due to testing constraints where flask is completely mocked in test_security.py,
+        # we can only verify that the MAX_CONTENT_LENGTH config is properly set on the mock's dictionary.
+        # Since it is a MagicMock, assigning app.config['key'] = value sets it in a mocked dictionary way.
+
+        # When main.py does app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024, it uses the __setitem__ method on the config mock
+        # We can extract the call args.
+        config_mock = main.app.config
+        found = False
+        for call in config_mock.__setitem__.call_args_list:
+            if call[0][0] == 'MAX_CONTENT_LENGTH' and call[0][1] == 2 * 1024 * 1024:
+                found = True
+                break
+        self.assertTrue(found, "MAX_CONTENT_LENGTH should be set to 2MB in app config")
 
 if __name__ == '__main__':
     unittest.main()

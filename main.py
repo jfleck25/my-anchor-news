@@ -64,6 +64,9 @@ else:
 app = flask.Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
+# 🛡️ Sentinel: Enforce a global 2MB request payload limit to prevent resource exhaustion / DoS
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
+
 allowed_origins = os.environ.get("ALLOWED_ORIGINS")
 if allowed_origins:
     origins_list = [origin.strip() for origin in allowed_origins.split(",") if origin.strip()]
@@ -928,7 +931,8 @@ def share_briefing():
             conn = get_db_connection()
             try:
                 cur = conn.cursor()
-                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(sanitized_data)))
+                # 🛡️ Sentinel: Fixed uninitialized variable reference; using the validated 'data'
+                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(data)))
                 conn.commit(); cur.close()
             finally:
                 release_db_connection(conn)
