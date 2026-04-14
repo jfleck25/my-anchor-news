@@ -9,3 +9,7 @@
 ## 2024-05-19 - Use string builder pattern for building large texts in a loop
 **Learning:** Using `+=` for string concatenation in a loop over many strings creates a new string object and copies the memory every iteration, resulting in O(N^2) time complexity. Using an array and calling `.append()` each iteration, then `"".join(array)` at the end reduces this to O(N) operations and gives significant speedups.
 **Action:** Whenever generating strings in a loop by accumulating parts, always use the `.append()` and `"".join()` pattern to prevent O(N^2) memory and execution overhead.
+
+## $(date +%Y-%m-%d) - Optimize TTS chunking string accumulation
+**Learning:** In text-to-speech script chunking, string concatenation `+=` within a loop combined with repeatedly encoding the entire accumulating string to check its byte length results in O(N^2) time complexity. For large briefing scripts, this becomes a CPU bottleneck.
+**Action:** Use the string builder pattern (`.append()` parts to a list, then `"".join()`) and maintain a running sum of bytes (by only encoding the newly added piece) rather than re-evaluating the whole chunk's length on each iteration.
