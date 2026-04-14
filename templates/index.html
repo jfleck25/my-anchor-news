@@ -342,7 +342,7 @@
                                         placeholder="e.g. Apple, Interest Rates"
                                         className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-sm rounded-lg focus-visible:ring-brand-500 focus-visible:border-brand-500 block p-2.5"
                                     />
-                                    <button onClick={handleAddKeyword} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Add</button>
+                                    <button onClick={handleAddKeyword} disabled={!newKeyword.trim()} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed">Add</button>
                                 </div>
                                 {keywords.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mb-2">
@@ -369,7 +369,7 @@
                                         placeholder="e.g. bloomberg.com"
                                         className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-sm rounded-lg focus-visible:ring-brand-500 focus-visible:border-brand-500 block p-2.5"
                                     />
-                                    <button onClick={handleAddSource} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900">Add</button>
+                                    <button onClick={handleAddSource} disabled={!newSource.trim()} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed">Add</button>
                                 </div>
                                 <div className="bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-2 max-h-40 overflow-y-auto">
                                     {sources.length === 0 ? (
@@ -1223,8 +1223,8 @@
                                         </button>
                                     )}
                                     {analysis && (
-                                        <button onClick={handleShare} className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" title="Share Briefing Link" aria-label={shareUrl ? "Link copied to clipboard" : "Share Briefing Link"}>
-                                            {shareUrl ? <Icons.Check /> : <Icons.Share />}
+                                        <button onClick={handleShare} disabled={isSharing} className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed" title="Share Briefing Link" aria-label={shareUrl ? "Link copied to clipboard" : isSharing ? "Sharing..." : "Share Briefing Link"}>
+                                            {isSharing ? <span className="inline-block animate-spin"><Icons.Refresh /></span> : shareUrl ? <Icons.Check /> : <Icons.Share />}
                                         </button>
                                     )}
                                     <button onClick={handleFetchAndAnalyze} disabled={isFetching || isGeneratingAudio} className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white font-medium rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm" title="Refresh briefing (R)" aria-label={isFetching ? "Scanning inbox" : "Refresh briefing"}>
