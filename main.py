@@ -64,6 +64,9 @@ else:
 app = flask.Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
+# 🛡️ Sentinel: Enforce a global 2MB request payload limit to prevent resource exhaustion / DoS
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
+
 allowed_origins = os.environ.get("ALLOWED_ORIGINS")
 if allowed_origins:
     origins_list = [origin.strip() for origin in allowed_origins.split(",") if origin.strip()]
@@ -616,7 +619,8 @@ def oauth2callback():
         if 'state' not in session:
             print("ERROR: State missing from session")
             return jsonify({'error': 'Invalid session state'}), 400
-        state = session['state']
+        # 🛡️ Sentinel: Pop state from session to prevent OAuth replay attacks
+        state = session.pop('state')
         code_verifier = session.pop('code_verifier', None)
         if not code_verifier:
             print("ERROR: code_verifier missing from session (PKCE required across redirect)")
@@ -928,7 +932,8 @@ def share_briefing():
             conn = get_db_connection()
             try:
                 cur = conn.cursor()
-                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(sanitized_data)))
+                # 🛡️ Sentinel: Fixed uninitialized variable reference; using the validated 'data'
+                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(data)))
                 conn.commit(); cur.close()
             finally:
                 release_db_connection(conn)

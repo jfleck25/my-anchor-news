@@ -342,7 +342,7 @@
                                         placeholder="e.g. Apple, Interest Rates"
                                         className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-sm rounded-lg focus-visible:ring-brand-500 focus-visible:border-brand-500 block p-2.5"
                                     />
-                                    <button onClick={handleAddKeyword} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Add</button>
+                                    <button onClick={handleAddKeyword} disabled={!newKeyword.trim()} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed">Add</button>
                                 </div>
                                 {keywords.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mb-2">
@@ -369,7 +369,7 @@
                                         placeholder="e.g. bloomberg.com"
                                         className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-sm rounded-lg focus-visible:ring-brand-500 focus-visible:border-brand-500 block p-2.5"
                                     />
-                                    <button onClick={handleAddSource} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900">Add</button>
+                                    <button onClick={handleAddSource} disabled={!newSource.trim()} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed">Add</button>
                                 </div>
                                 <div className="bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-2 max-h-40 overflow-y-auto">
                                     {sources.length === 0 ? (
@@ -565,6 +565,7 @@
             const [isSharing, setIsSharing] = React.useState(false);
             const [shareUrl, setShareUrl] = React.useState(null);
             const [copySuccess, setCopySuccess] = React.useState(false);
+            const [copyErrorSuccess, setCopyErrorSuccess] = React.useState(false);
             const [playbackRate, setPlaybackRate] = React.useState(1.0);
             const [error, setError] = React.useState(null);
             const [isSettingsOpen, setIsSettingsOpen] = React.useState(false);
@@ -1222,18 +1223,19 @@
                                         </button>
                                     )}
                                     {analysis && (
-                                        <button onClick={handleShare} className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" title="Share Briefing Link" aria-label={shareUrl ? "Link copied to clipboard" : "Share Briefing Link"}>
-                                            {shareUrl ? <Icons.Check /> : <Icons.Share />}
+                                        <button onClick={handleShare} disabled={isSharing} className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed" title="Share Briefing Link" aria-label={shareUrl ? "Link copied to clipboard" : isSharing ? "Sharing..." : "Share Briefing Link"}>
+                                            {isSharing ? <span className="inline-block animate-spin"><Icons.Refresh /></span> : shareUrl ? <Icons.Check /> : <Icons.Share />}
                                         </button>
                                     )}
                                     <button onClick={handleFetchAndAnalyze} disabled={isFetching || isGeneratingAudio} className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white font-medium rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm" title="Refresh briefing (R)" aria-label={isFetching ? "Scanning inbox" : "Refresh briefing"}>
                                         {isFetching ? <span className="inline-block animate-spin"><Icons.Refresh /></span> : <Icons.Refresh />}
                                         {isFetching ? 'Scanning...' : 'Refresh'}
-                                        <kbd className="hidden sm:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-sans font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600 rounded">R</kbd>
+                                        {!isFetching && <kbd className="hidden sm:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-sans font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600 rounded">R</kbd>}
                                     </button>
                                     {analysis && (
-                                        <button onClick={handleGenerateAudio} disabled={isGeneratingAudio || isFetching} className="flex items-center gap-2 px-6 py-3 bg-brand-500 text-white font-bold rounded-xl hover:bg-brand-600 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-brand-500/30 transition-all transform" title="Play briefing audio (P)" aria-label={isPreloadingAudio ? "Preparing audio" : isGeneratingAudio ? "Synthesizing audio" : "Play briefing audio"}>
-                                            {isPreloadingAudio ? <><span className="inline-block animate-spin"><Icons.Refresh /></span> Preparing audio...</> : isGeneratingAudio ? <><span className="inline-block animate-spin"><Icons.Refresh /></span> Synthesizing...</> : <><Icons.Play /> Play Briefing <kbd className="hidden sm:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-sans font-medium bg-brand-600/50 text-white border border-brand-400/30 rounded">P</kbd></>}
+                                        <button onClick={handleGenerateAudio} disabled={isGeneratingAudio || isFetching} className="flex items-center gap-2 px-6 py-3 bg-brand-500 text-white font-bold rounded-xl hover:bg-brand-600 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-lg shadow-brand-500/30 transition-all transform" title="Play briefing audio (P)" aria-label={isPreloadingAudio ? "Preparing audio" : isGeneratingAudio ? "Synthesizing audio" : "Play briefing audio"}>
+                                            {(isPreloadingAudio || isGeneratingAudio) ? <span className="inline-block animate-spin"><Icons.Refresh /></span> : <Icons.Play />}
+                                            {isPreloadingAudio ? 'Preparing audio...' : isGeneratingAudio ? 'Synthesizing...' : <>Play Briefing <kbd className="hidden sm:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-sans font-medium bg-brand-600/50 text-white border border-brand-400/30 rounded">P</kbd></>}
                                         </button>
                                     )}
                                 </div>
@@ -1245,8 +1247,9 @@
                                 <p className="flex-1 min-w-0">{error}</p>
                                 <div className="flex items-center gap-2 shrink-0">
                                     <button onClick={() => { setError(null); handleFetchAndAnalyze(); }} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500" aria-label="Retry">Retry</button>
-                                    <button onClick={() => { try { navigator.clipboard.writeText(error); } catch (e) {} }} className="p-2 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" title="Copy error" aria-label="Copy error to clipboard">
-                                        <Icons.Copy />
+                                    <button onClick={() => { try { navigator.clipboard.writeText(error).then(() => { setCopyErrorSuccess(true); setTimeout(() => setCopyErrorSuccess(false), 3000); }); } catch (e) {} }} className="p-2 relative text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" title="Copy error" aria-label="Copy error to clipboard">
+                                        {copyErrorSuccess ? <Icons.Check /> : <Icons.Copy />}
+                                        {copyErrorSuccess && <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs py-1 px-2 rounded opacity-100 transition-opacity whitespace-nowrap">Copied!</span>}
                                     </button>
                                 </div>
                             </div>
@@ -1311,7 +1314,7 @@
                                     <svg className="w-10 h-10 text-slate-300 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 12h6m-1 8h.01" /></svg>
                                 </div>
                                 <p className="text-slate-500 dark:text-slate-400 mb-8">Ready to fetch your daily briefing.</p>
-                                <button onClick={handleFetchAndAnalyze} disabled={isFetching} className="flex items-center gap-2 px-8 py-4 bg-brand-500 text-white font-bold rounded-xl hover:bg-brand-600 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 shadow-lg shadow-brand-500/30 transition-all transform mx-auto" aria-label={isFetching ? "Scanning inbox" : "Get my briefing"}>
+                                <button onClick={handleFetchAndAnalyze} disabled={isFetching} className="flex items-center gap-2 px-8 py-4 bg-brand-500 text-white font-bold rounded-xl hover:bg-brand-600 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg shadow-brand-500/30 transition-all transform mx-auto" aria-label={isFetching ? "Scanning inbox" : "Get my briefing"}>
                                     {isFetching ? <span className="inline-block animate-spin"><Icons.Refresh /></span> : <Icons.Refresh />}
                                     {isFetching ? 'Scanning...' : 'Get my briefing'}
                                 </button>
