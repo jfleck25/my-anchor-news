@@ -619,7 +619,8 @@ def oauth2callback():
         if 'state' not in session:
             print("ERROR: State missing from session")
             return jsonify({'error': 'Invalid session state'}), 400
-        state = session['state']
+        # 🛡️ Sentinel: Pop state from session to prevent OAuth replay attacks
+        state = session.pop('state')
         code_verifier = session.pop('code_verifier', None)
         if not code_verifier:
             print("ERROR: code_verifier missing from session (PKCE required across redirect)")

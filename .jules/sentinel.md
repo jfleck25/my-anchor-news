@@ -53,3 +53,7 @@
 **Vulnerability:** The application accepted unconstrained incoming JSON payloads without imposing a `MAX_CONTENT_LENGTH` on the Flask configuration.
 **Learning:** Without setting a global upper bound on request content length, attackers can submit excessively large payloads to endpoints like `/api/share` or `/api/settings` causing resource exhaustion, memory out-of-bounds, and application unavailability (Denial of Service).
 **Prevention:** Always configure `app.config['MAX_CONTENT_LENGTH']` in Flask to limit incoming request sizes according to acceptable use cases (e.g., 2MB).
+## 2026-04-08 - OAuth State Replay Vulnerability
+**Vulnerability:** The `oauth2callback` endpoint retrieved the OAuth `state` parameter from the user's session using `state = session['state']` but failed to pop it from the session. This leaves the `state` parameter in the session, allowing it to potentially be reused.
+**Learning:** Failing to remove single-use tokens (like OAuth state) from session storage after their first use leaves them vulnerable to replay attacks if an attacker intercepts an authorization response.
+**Prevention:** Always use `session.pop('key')` instead of `session['key']` when retrieving single-use security tokens from session storage to ensure they are immediately invalidated.
