@@ -64,6 +64,9 @@ else:
 app = flask.Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
+# 🛡️ Sentinel: Enforce a global 2MB request payload limit to prevent resource exhaustion / DoS
+app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
+
 allowed_origins = os.environ.get("ALLOWED_ORIGINS")
 if allowed_origins:
     origins_list = [origin.strip() for origin in allowed_origins.split(",") if origin.strip()]
@@ -616,7 +619,8 @@ def oauth2callback():
         if 'state' not in session:
             print("ERROR: State missing from session")
             return jsonify({'error': 'Invalid session state'}), 400
-        state = session['state']
+        # 🛡️ Sentinel: Pop state from session to prevent OAuth replay attacks
+        state = session.pop('state')
         code_verifier = session.pop('code_verifier', None)
         if not code_verifier:
             print("ERROR: code_verifier missing from session (PKCE required across redirect)")
@@ -864,17 +868,23 @@ def generate_audio():
 
         sentences = re.split(r'(?<=[.!?])\s+', script_text)
         chunks = []
-        current_chunk = ""
+        # ⚡ Bolt: Replace O(N^2) string concatenation loop with string builder pattern and incremental byte tracking
+        current_chunk_parts = []
+        current_chunk_bytes = 0
         byte_limit = 4800
         for sentence in sentences:
-            if len(current_chunk.encode('utf-8')) + len(sentence.encode('utf-8')) + 1 < byte_limit:
-                current_chunk += sentence + " "
+            sentence_bytes = len(sentence.encode('utf-8')) + 1 # +1 for the space
+            if current_chunk_bytes + sentence_bytes < byte_limit:
+                current_chunk_parts.append(sentence)
+                current_chunk_parts.append(" ")
+                current_chunk_bytes += sentence_bytes
             else:
-                if current_chunk:
-                    chunks.append(current_chunk)
-                current_chunk = sentence + " "
-        if current_chunk:
-            chunks.append(current_chunk)
+                if current_chunk_parts:
+                    chunks.append("".join(current_chunk_parts))
+                current_chunk_parts = [sentence, " "]
+                current_chunk_bytes = sentence_bytes
+        if current_chunk_parts:
+            chunks.append("".join(current_chunk_parts))
 
         worker_args = [(i, chunk_text, creds_dict, style, PROJECT_ID) for i, chunk_text in enumerate(chunks)]
         t_start = time.time()
@@ -928,7 +938,8 @@ def share_briefing():
             conn = get_db_connection()
             try:
                 cur = conn.cursor()
-                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(sanitized_data)))
+                # 🛡️ Sentinel: Fixed uninitialized variable reference; using the validated 'data'
+                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(data)))
                 conn.commit(); cur.close()
             finally:
                 release_db_connection(conn)
