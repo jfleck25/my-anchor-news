@@ -495,11 +495,15 @@ def _fetch_one_message(args):
     """Fetch a single Gmail message. Used by parallel workers. Returns (index, email_block, is_priority) or (index, None, None) on skip/error."""
     index, message_id, creds_dict, keywords, priority_sources = args
     try:
-        if not hasattr(_worker_thread_locals, 'gmail_service'):
+        if not hasattr(_worker_thread_locals, 'auth_session'):
             creds = get_credentials_from_session(creds_dict)
-            _worker_thread_locals.gmail_service = build('gmail', 'v1', credentials=creds)
-        service = _worker_thread_locals.gmail_service
-        msg = service.users().messages().get(userId='me', id=message_id, format='full').execute()
+            _worker_thread_locals.auth_session = AuthorizedSession(creds)
+
+        session = _worker_thread_locals.auth_session
+        url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{message_id}?format=full"
+        resp = session.get(url, timeout=10)
+        resp.raise_for_status()
+        msg = resp.json()
         headers = msg['payload']['headers']
 
         # ⚡ Bolt: Extract subject and sender in a single pass, avoiding redundant .lower() calls
@@ -736,7 +740,6 @@ def fetch_emails():
     creds = Credentials(**creds_data)
     creds_dict = dict(creds_data)
     try:
-        service = build('gmail', 'v1', credentials=creds)
         sources = settings.get('sources', []) or ["wsj.com", "nytimes.com"]
         hours = settings.get('time_window_hours', 24)
 
@@ -746,7 +749,13 @@ def fetch_emails():
 
         sources_query = " OR ".join([f"from:{s}" for s in sources])
         query = f"({sources_query}) newer_than:{hours}h"
-        results = service.users().messages().list(userId='me', q=query, maxResults=50).execute()
+
+        # ⚡ Bolt: Use AuthorizedSession directly for Gmail API to avoid discovery document fetch
+        auth_session = AuthorizedSession(creds)
+        url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages"
+        resp = auth_session.get(url, params={'q': query, 'maxResults': 50}, timeout=10)
+        resp.raise_for_status()
+        results = resp.json()
         messages = results.get('messages', [])
         if not messages:
             return jsonify({'story_groups': [], 'remaining_stories': [{'headline': f'No newsletters found in last {hours}h.'}]})
