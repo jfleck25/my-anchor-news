@@ -13,3 +13,6 @@
 ## $(date +%Y-%m-%d) - Optimize TTS chunking string accumulation
 **Learning:** In text-to-speech script chunking, string concatenation `+=` within a loop combined with repeatedly encoding the entire accumulating string to check its byte length results in O(N^2) time complexity. For large briefing scripts, this becomes a CPU bottleneck.
 **Action:** Use the string builder pattern (`.append()` parts to a list, then `"".join()`) and maintain a running sum of bytes (by only encoding the newly added piece) rather than re-evaluating the whole chunk's length on each iteration.
+## 2024-05-14 - Replace googleapiclient.discovery.build() with AuthorizedSession for performance
+**Learning:** Using `googleapiclient.discovery.build()` for Gmail API calls synchronously downloads a large JSON discovery document. In a `ThreadPoolExecutor` where thread locals are used (e.g. `_worker_thread_locals`), this expensive network call is repeated for *every* thread, drastically slowing down parallel execution.
+**Action:** When making simple, statically known Google API calls, replace `discovery.build()` with `google.auth.transport.requests.AuthorizedSession` to make direct REST calls. It preserves token refreshment logic while eliminating discovery overhead. Ensure `AuthorizedSession` is imported (`from google.auth.transport.requests import AuthorizedSession`).
