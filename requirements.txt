@@ -8,7 +8,7 @@ google-cloud-texttospeech>=2.36.0
 lxml
 gunicorn>=25.3.0
 werkzeug>=3.1.8
-protobuf>=7.34.1
+protobuf>=4.25.3
 urllib3>=2.6.3
 requests>=2.33.1
 zipp>=3.19.1
