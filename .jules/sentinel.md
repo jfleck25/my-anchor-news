@@ -57,3 +57,8 @@
 **Vulnerability:** The `oauth2callback` endpoint retrieved the OAuth `state` parameter from the user's session using `state = session['state']` but failed to pop it from the session. This leaves the `state` parameter in the session, allowing it to potentially be reused.
 **Learning:** Failing to remove single-use tokens (like OAuth state) from session storage after their first use leaves them vulnerable to replay attacks if an attacker intercepts an authorization response.
 **Prevention:** Always use `session.pop('key')` instead of `session['key']` when retrieving single-use security tokens from session storage to ensure they are immediately invalidated.
+
+## 2025-04-06 - Rate Limiting on External API Calls
+**Vulnerability:** Endpoints that consume external APIs (like TTS generation) or database resources (like sharing briefings) lacked rate limits, leaving the application vulnerable to resource exhaustion and financial DoS attacks from authenticated users.
+**Learning:** Rate limiting is not just for primary data-fetching routes; it is crucial for *all* endpoints that perform intensive operations, call costly external APIs, or allocate storage, even if the user is authenticated.
+**Prevention:** Always apply rate limits (`@limiter.limit()`) to sensitive authenticated endpoints that consume significant resources or external quota.
