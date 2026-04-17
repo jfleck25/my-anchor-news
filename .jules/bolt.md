@@ -16,3 +16,7 @@
 ## 2024-05-14 - Replace googleapiclient.discovery.build() with AuthorizedSession for performance
 **Learning:** Using `googleapiclient.discovery.build()` for Gmail API calls synchronously downloads a large JSON discovery document. In a `ThreadPoolExecutor` where thread locals are used (e.g. `_worker_thread_locals`), this expensive network call is repeated for *every* thread, drastically slowing down parallel execution.
 **Action:** When making simple, statically known Google API calls, replace `discovery.build()` with `google.auth.transport.requests.AuthorizedSession` to make direct REST calls. It preserves token refreshment logic while eliminating discovery overhead. Ensure `AuthorizedSession` is imported (`from google.auth.transport.requests import AuthorizedSession`).
+
+## 2026-04-17 - Use copy.deepcopy for in-memory caching
+**Learning:** When implementing in-memory caching in Python, returning direct references to cached mutable objects (like dicts) causes 'state leakage', where modifications to the returned object by calling code unintentionally mutate the cache globally for all requests.
+**Action:** Always use `copy.deepcopy()` when storing objects into and returning objects from an in-memory cache to ensure state isolation.

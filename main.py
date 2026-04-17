@@ -130,12 +130,17 @@ SCOPES = [
     'https://www.googleapis.com/auth/cloud-platform'
 ]
 
+import copy
+
 CLIENT_SECRETS_FILE = "client_secrets.json"
 SETTINGS_FILE = "user_settings.json"
 CACHE_FILE = "cache.json"
 CACHE_TTL_SECONDS = 900
 _cache_lock = threading.Lock()
 _worker_thread_locals = threading.local()
+
+_file_settings_cache = None
+_file_settings_lock = threading.Lock()
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
@@ -282,6 +287,8 @@ def get_user_info():
         return None
 
 def load_settings(user_email=None):
+    global _file_settings_cache
+
     defaults = {
         "sources": ["wsj.com", "nytimes.com", "axios.com", "theguardian.com", "techcrunch.com"],
         "time_window_hours": 24,
@@ -307,15 +314,22 @@ def load_settings(user_email=None):
         except Exception:
             pass
 
-    if not os.path.exists(SETTINGS_FILE):
-        return defaults
-    try:
-        with open(SETTINGS_FILE, 'r') as f:
-            return json.load(f)
-    except Exception:
-        return defaults
+    with _file_settings_lock:
+        if _file_settings_cache is not None:
+            return copy.deepcopy(_file_settings_cache)
+
+        if not os.path.exists(SETTINGS_FILE):
+            return defaults
+        try:
+            with open(SETTINGS_FILE, 'r') as f:
+                data = json.load(f)
+                _file_settings_cache = copy.deepcopy(data)
+                return data
+        except Exception:
+            return defaults
 
 def save_settings(new_settings, user_email=None):
+    global _file_settings_cache
     if DATABASE_URL and user_email:
         try:
             conn = get_db_connection()
@@ -337,6 +351,8 @@ def save_settings(new_settings, user_email=None):
     try:
         with open(SETTINGS_FILE, 'w') as f:
             json.dump(new_settings, f, indent=2)
+        with _file_settings_lock:
+            _file_settings_cache = copy.deepcopy(new_settings)
         return True
     except Exception as e:
         print(f"Error saving settings to file: {e}")
