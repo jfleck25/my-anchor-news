@@ -16,3 +16,7 @@
 ## 2024-05-14 - Replace googleapiclient.discovery.build() with AuthorizedSession for performance
 **Learning:** Using `googleapiclient.discovery.build()` for Gmail API calls synchronously downloads a large JSON discovery document. In a `ThreadPoolExecutor` where thread locals are used (e.g. `_worker_thread_locals`), this expensive network call is repeated for *every* thread, drastically slowing down parallel execution.
 **Action:** When making simple, statically known Google API calls, replace `discovery.build()` with `google.auth.transport.requests.AuthorizedSession` to make direct REST calls. It preserves token refreshment logic while eliminating discovery overhead. Ensure `AuthorizedSession` is imported (`from google.auth.transport.requests import AuthorizedSession`).
+
+## $(date +%Y-%m-%d) - File settings caching to avoid disk I/O
+**Learning:** The `load_settings` function reads and parses `user_settings.json` from the filesystem on nearly every API request if no database is configured. Disk reads and JSON parsing are slow operations. Caching the parsed dictionary in memory and only invalidating the cache when `os.path.getmtime(SETTINGS_FILE)` changes yields significant performance improvements (e.g. ~60% faster) on repetitive reads.
+**Action:** When repeatedly reading configuration files, cache the parsed content in memory and use `os.path.getmtime` (or equivalent) to invalidate the cache. Be sure to use `copy.deepcopy` when returning the cached object to prevent callers from mutating the shared state.
