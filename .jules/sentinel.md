@@ -57,3 +57,8 @@
 **Vulnerability:** The `oauth2callback` endpoint retrieved the OAuth `state` parameter from the user's session using `state = session['state']` but failed to pop it from the session. This leaves the `state` parameter in the session, allowing it to potentially be reused.
 **Learning:** Failing to remove single-use tokens (like OAuth state) from session storage after their first use leaves them vulnerable to replay attacks if an attacker intercepts an authorization response.
 **Prevention:** Always use `session.pop('key')` instead of `session['key']` when retrieving single-use security tokens from session storage to ensure they are immediately invalidated.
+
+## 2026-04-09 - Missing Rate Limiting on Resource-Intensive Endpoints
+**Vulnerability:** The `/api/generate_audio` and `/api/share` endpoints did not have any rate limits configured. Since these endpoints either consume external APIs (Google TTS) or allocate storage (PostgreSQL), an attacker could repeatedly call them to exhaust resources, inflate cloud billing (financial DoS), or bloat the database.
+**Learning:** Even when endpoints require user authentication, they are still vulnerable to abuse by malicious or compromised accounts. Any endpoint that performs resource-intensive operations, allocates storage, or consumes external APIs must be rate-limited to protect system availability and control costs.
+**Prevention:** Always apply rate limiting (e.g., using `flask_limiter`) to sensitive, resource-heavy endpoints, and ensure the limit is tied to the user's identity (like their email or ID) rather than just their IP address to prevent distributed abuse.
