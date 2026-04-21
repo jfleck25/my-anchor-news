@@ -20,7 +20,6 @@ from flask import request, redirect, session, url_for, jsonify, render_template
 from flask_cors import CORS
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
 import google.generativeai as genai
 from google.cloud import texttospeech
 from google.api_core import client_options 

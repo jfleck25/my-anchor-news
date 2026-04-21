@@ -1,10 +1,4 @@
-💡 What: Added visual loading states and prevented inappropriate button scaling when disabled. Specifically:
-- Added a spinning icon indicator to the "Refresh" and "Play Briefing" buttons when async operations are running.
-- Hid keyboard shortcut `<kbd>` hints on these buttons while in a loading state to reduce visual noise.
-- Added `disabled:hover:scale-100` and `disabled:cursor-not-allowed` to interactive buttons with scale effects (like the main "Get my briefing" button) to prevent them from visually scaling up when hovered in a disabled state.
-
-🎯 Why: To provide better feedback during async operations (loading/fetching states) and to avoid misleading visual hover scaling on disabled buttons.
-
-📸 Before/After: Visual improvements on loading states and disabled hovering.
-
-♿ Accessibility: The buttons now offer clear cursor-not-allowed indications when disabled, alongside screen reader compatible dynamic loading text.
+🎯 **What:** Removed unused import `build` from `googleapiclient.discovery` in `main.py`.
+💡 **Why:** Reduces clutter, potentially saves memory/load time, and improves maintainability by removing code that isn't being used.
+✅ **Verification:** Verified via `grep` that `build` isn't used anywhere in `main.py`, ran tests to ensure that the change is safe.
+✨ **Result:** Improved code cleanliness and readability.
