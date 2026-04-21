@@ -3,7 +3,6 @@ import os
 import unittest
 from unittest.mock import MagicMock, patch, mock_open
 import importlib
-import json
 
 MOCKED_MODULES = [
     'flask', 'flask_cors', 'google_auth_oauthlib', 'google_auth_oauthlib.flow',
@@ -13,7 +12,7 @@ MOCKED_MODULES = [
     'google.auth.transport.requests', 'werkzeug', 'werkzeug.middleware',
     'werkzeug.middleware.proxy_fix', 'psycopg2', 'psycopg2.extras',
     'flask_limiter', 'flask_limiter.util', 'sentry_sdk',
-    'sentry_sdk.integrations', 'sentry_sdk.integrations.flask', 'dotenv'
+    'sentry_sdk.integrations', 'sentry_sdk.integrations.flask', 'dotenv', 'posthog', 'google.api_core.exceptions', 'psycopg2.pool'
 ]
 
 class TestLoadSettings(unittest.TestCase):
@@ -44,7 +43,8 @@ class TestLoadSettings(unittest.TestCase):
         self.patcher.stop()
 
     @patch('os.path.exists')
-    def test_load_settings_file_not_exists(self, mock_exists):
+    @patch('os.path.getmtime')
+    def test_load_settings_file_not_exists(self, mock_mtime, mock_exists):
         mock_exists.return_value = False
         settings = self.main_module.load_settings()
 
@@ -53,8 +53,9 @@ class TestLoadSettings(unittest.TestCase):
         self.assertEqual(settings['personality'], "anchor")
 
     @patch('os.path.exists')
+    @patch('os.path.getmtime')
     @patch('builtins.open', new_callable=mock_open)
-    def test_load_settings_read_exception(self, mock_file, mock_exists):
+    def test_load_settings_read_exception(self, mock_file, mock_mtime, mock_exists):
         mock_exists.return_value = True
         mock_file.side_effect = Exception("Permission denied")
 
@@ -66,8 +67,9 @@ class TestLoadSettings(unittest.TestCase):
         self.assertEqual(settings['personality'], "anchor")
 
     @patch('os.path.exists')
+    @patch('os.path.getmtime')
     @patch('builtins.open', new_callable=mock_open, read_data='{"sources": ["test.com"], "time_window_hours": 12, "personality": "funny"}')
-    def test_load_settings_success(self, mock_file, mock_exists):
+    def test_load_settings_success(self, mock_file, mock_mtime, mock_exists):
         mock_exists.return_value = True
 
         settings = self.main_module.load_settings()
