@@ -526,21 +526,9 @@ def _fetch_one_message(args):
         msg = resp.json()
         headers = msg['payload']['headers']
 
-        # ⚡ Bolt: Extract subject and sender in a single pass, avoiding redundant .lower() calls
-        subject = 'No Subject'
-        sender = 'No Sender'
-        found_subject = False
-        found_sender = False
-        for h in headers:
-            name_lower = h['name'].lower()
-            if not found_subject and name_lower == 'subject':
-                subject = h['value']
-                found_subject = True
-            elif not found_sender and name_lower == 'from':
-                sender = h['value']
-                found_sender = True
-            if found_subject and found_sender:
-                break
+        # ⚡ Bolt: Extract subject and sender using generator expressions
+        subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
+        sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'No Sender')
 
         body_data = ""
         if 'parts' in msg['payload']:
