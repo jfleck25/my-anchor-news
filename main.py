@@ -866,6 +866,8 @@ def generate_audio():
     creds_dict = dict(creds_data)
     try:
         analysis_data = request.get_json()
+        if not isinstance(analysis_data, dict):
+            return jsonify({'error': 'Invalid data format. Expected a JSON object.'}), 400
         if not analysis_data:
             return jsonify({'error': 'No briefing data to convert to audio.'}), 400
         script_text = generate_script_from_analysis(analysis_data, style)

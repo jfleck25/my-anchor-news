@@ -58,7 +58,7 @@
 **Learning:** Failing to remove single-use tokens (like OAuth state) from session storage after their first use leaves them vulnerable to replay attacks if an attacker intercepts an authorization response.
 **Prevention:** Always use `session.pop('key')` instead of `session['key']` when retrieving single-use security tokens from session storage to ensure they are immediately invalidated.
 
-## 2025-04-19 - Missing Rate Limiting on Resource-Intensive Endpoints
-**Vulnerability:** The `/api/generate_audio` and `/api/share` endpoints lacked rate limiting, making them vulnerable to resource exhaustion and financial Denial of Service, despite requiring authentication.
-**Learning:** Even for authenticated routes, any endpoint that performs resource-heavy operations (e.g., calling external Google TTS APIs) or allocates storage must enforce rate limiting to prevent abuse.
-**Prevention:** Always apply the `@limiter.limit` decorator to any endpoint that consumes external API credits or performs significant computation/storage.
+## 2025-04-06 - Rate Limiting on External API Calls
+**Vulnerability:** Endpoints that consume external APIs (like TTS generation) or database resources (like sharing briefings) lacked rate limits, leaving the application vulnerable to resource exhaustion and financial DoS attacks from authenticated users.
+**Learning:** Rate limiting is not just for primary data-fetching routes; it is crucial for *all* endpoints that perform intensive operations, call costly external APIs, or allocate storage, even if the user is authenticated.
+**Prevention:** Always apply rate limits (`@limiter.limit()`) to sensitive authenticated endpoints that consume significant resources or external quota.
