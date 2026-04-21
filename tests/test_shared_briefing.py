@@ -1,5 +1,4 @@
 import sys
-import os
 import unittest
 from unittest.mock import MagicMock, patch
 import importlib
@@ -8,12 +7,12 @@ MOCKED_MODULES = [
     'flask', 'flask_cors', 'google_auth_oauthlib', 'google_auth_oauthlib.flow',
     'google', 'google.oauth2', 'google.oauth2.credentials', 'googleapiclient',
     'googleapiclient.discovery', 'google.generativeai', 'google.cloud',
-    'google.api_core', 'bs4', 'google.auth', 'google.auth.transport',
+    'google.api_core', 'google.api_core.exceptions', 'bs4', 'google.auth', 'google.auth.transport',
     'google.auth.transport.requests', 'werkzeug', 'werkzeug.middleware',
     'werkzeug.middleware.proxy_fix', 'psycopg2', 'psycopg2.extras',
     'psycopg2.pool',
     'flask_limiter', 'flask_limiter.util', 'sentry_sdk',
-    'sentry_sdk.integrations', 'sentry_sdk.integrations.flask', 'dotenv'
+    'sentry_sdk.integrations', 'sentry_sdk.integrations.flask', 'dotenv', 'posthog'
 ]
 
 class TestSharedBriefing(unittest.TestCase):

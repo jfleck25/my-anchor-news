@@ -1,6 +1,5 @@
 import sys
 from unittest.mock import MagicMock, patch
-import pytest
 
 # Mock heavy dependencies before importing main to prevent side effects and errors
 sys.modules['google.auth'] = MagicMock()
