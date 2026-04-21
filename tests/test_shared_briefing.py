@@ -30,6 +30,18 @@ class TestSharedBriefing(unittest.TestCase):
             return decorator
         self.mock_app.route = mock_route
 
+        # We need to mock Limiter properly so its decorators don't fail during import
+        mock_limiter = MagicMock()
+        def limit_decorator(*args, **kwargs):
+            def decorator(f):
+                return f
+            return decorator
+        mock_limiter.limit = limit_decorator
+
+        mock_flask_limiter = MagicMock()
+        mock_flask_limiter.Limiter.return_value = mock_limiter
+        self.mocks['flask_limiter'] = mock_flask_limiter
+
         self.patcher = patch.dict('sys.modules', self.mocks)
         self.patcher.start()
 

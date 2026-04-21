@@ -24,7 +24,9 @@ class TestShareBriefing(unittest.TestCase):
             def decorator(f):
                 return f
             return decorator
-        mock_limiter.limit.return_value = limit_decorator
+        # Actually set the limit method to our fake decorator directly on the mock instance
+        mock_limiter.limit = limit_decorator
+
         mock_flask_limiter = MagicMock()
         mock_flask_limiter.Limiter.return_value = mock_limiter
         self.mocks['flask_limiter'] = mock_flask_limiter

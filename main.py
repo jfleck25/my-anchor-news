@@ -834,7 +834,7 @@ def fetch_emails():
         return jsonify({'error': "Unable to fetch newsletters. Please check your connection and try again."}), 500
 
 @app.route('/api/generate_audio', methods=['POST'])
-@limiter.limit("10 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit for audio generation.")
+@limiter.limit("5 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit of 5 audio generations. Upgrade to Pro for unlimited audio or try again tomorrow!")
 def generate_audio():
     if 'credentials' not in session: 
         return jsonify({'error': 'Please log in to generate audio.'}), 401
@@ -932,7 +932,7 @@ def generate_audio():
 
 # --- Share Endpoints ---
 @app.route('/api/share', methods=['POST'])
-@limiter.limit("20 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit for sharing briefings.")
+@limiter.limit("20 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit of 20 shared briefings.")
 def share_briefing():
     if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
     data = request.get_json()
