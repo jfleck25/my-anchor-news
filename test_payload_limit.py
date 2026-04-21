@@ -1,6 +1,5 @@
 import unittest
 from unittest.mock import patch, MagicMock
-import sys
 
 # We want to test flask functionality without completely mocking it.
 # But main.py imports so much stuff.
