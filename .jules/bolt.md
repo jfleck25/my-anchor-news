@@ -16,3 +16,7 @@
 ## 2024-05-14 - Replace googleapiclient.discovery.build() with AuthorizedSession for performance
 **Learning:** Using `googleapiclient.discovery.build()` for Gmail API calls synchronously downloads a large JSON discovery document. In a `ThreadPoolExecutor` where thread locals are used (e.g. `_worker_thread_locals`), this expensive network call is repeated for *every* thread, drastically slowing down parallel execution.
 **Action:** When making simple, statically known Google API calls, replace `discovery.build()` with `google.auth.transport.requests.AuthorizedSession` to make direct REST calls. It preserves token refreshment logic while eliminating discovery overhead. Ensure `AuthorizedSession` is imported (`from google.auth.transport.requests import AuthorizedSession`).
+
+## $(date +%Y-%m-%d) - Optimize JSON parsing overhead via file memory caching
+**Learning:** In scenarios where local settings or state are read from disk (`user_settings.json`) across many requests, repeatedly calling `json.load()` imposes both I/O latency and CPU overhead for parsing JSON.
+**Action:** Implement an in-memory cache protected by a thread lock and invalidated via `os.path.getmtime(filepath)`. Return a deep copy (`copy.deepcopy()`) of the cached dictionary to prevent state leakage and mutation from callers. This can drastically reduce overhead (e.g., from ~0.37ms to ~0.11ms on a cache hit).
