@@ -2,6 +2,7 @@
 import os
 import base64
 import json
+import copy
 import re
 import secrets
 import time
@@ -138,6 +139,9 @@ _cache_lock = threading.Lock()
 _worker_thread_locals = threading.local()
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
+
+_file_settings_cache = {'mtime': 0, 'data': None}
+_file_settings_lock = threading.Lock()
 
 # --- PERSONA CONFIGURATION ---
 PERSONAS = {
@@ -310,8 +314,17 @@ def load_settings(user_email=None):
     if not os.path.exists(SETTINGS_FILE):
         return defaults
     try:
-        with open(SETTINGS_FILE, 'r') as f:
-            return json.load(f)
+        mtime = os.path.getmtime(SETTINGS_FILE)
+        with _file_settings_lock:
+            if _file_settings_cache['mtime'] == mtime and _file_settings_cache['data'] is not None:
+                return copy.deepcopy(_file_settings_cache['data'])
+
+            with open(SETTINGS_FILE, 'r') as f:
+                data = json.load(f)
+
+            _file_settings_cache['mtime'] = mtime
+            _file_settings_cache['data'] = copy.deepcopy(data)
+            return data
     except Exception:
         return defaults
 

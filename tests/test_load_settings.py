@@ -65,9 +65,12 @@ class TestLoadSettings(unittest.TestCase):
         self.assertEqual(settings['time_window_hours'], 24)
         self.assertEqual(settings['personality'], "anchor")
 
+    @patch('os.path.getmtime')
     @patch('os.path.exists')
     @patch('builtins.open', new_callable=mock_open, read_data='{"sources": ["test.com"], "time_window_hours": 12, "personality": "funny"}')
-    def test_load_settings_success(self, mock_file, mock_exists):
+    def test_load_settings_success(self, mock_file, mock_exists, mock_getmtime):
+        mock_getmtime.return_value = 12345.0
+
         mock_exists.return_value = True
 
         settings = self.main_module.load_settings()
