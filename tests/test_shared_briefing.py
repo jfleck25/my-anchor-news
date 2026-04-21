@@ -29,6 +29,7 @@ class TestSharedBriefing(unittest.TestCase):
                 return f
             return decorator
         self.mock_app.route = mock_route
+        self.mocks['flask_limiter'].Limiter.return_value.limit = lambda *args, **kwargs: lambda f: f
 
         self.patcher = patch.dict('sys.modules', self.mocks)
         self.patcher.start()
