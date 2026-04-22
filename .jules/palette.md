@@ -8,3 +8,6 @@
 ## 2026-04-18 - Implicit Dismissals
 **Learning:** Fixed or persistent UI elements (like a sticky audio player) and modal dialogs require explicit and implicit dismiss interactions. Users naturally attempt to click backdrops or look for close buttons to reclaim screen real estate, rather than relying strictly on the active process ending.
 **Action:** Always implement `onClick={onClose}` on modal backdrops (with `e.stopPropagation()` on the inner container) and add explicit close buttons to persistent components that overlay content.
+## 2026-04-22 - Skip Links and Keyboard Accessibility
+**Learning:** When implementing 'skip-to-content' links, relying on standard 'sr-only' classes can sometimes cause unintended layout shifts or lack necessary interactivity when focused. Furthermore, the target container must be able to receive programmatic focus for screen readers to correctly resume context.
+**Action:** Use a reliable Tailwind positioning pattern (`absolute -translate-y-[200%] focus:translate-y-0`) to hide the link visually while ensuring it appears on focus. Always pair this with `id="content"`, `tabIndex="-1"`, and `focus:outline-none` on the target container (like `<main>`) to cleanly receive focus without a jarring visual ring.
