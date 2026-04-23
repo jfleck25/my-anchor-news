@@ -493,11 +493,25 @@ def analyze_news_with_llm(newsletters_text):
 
 # --- Caching Helpers ---
 # File-based cache is ephemeral on Render and not shared across workers; treat as best-effort.
+_file_cache_string = None
+_file_cache_mtime = 0
+
 def load_cache():
+    global _file_cache_string, _file_cache_mtime
     if not os.path.exists(CACHE_FILE): return {}
     try:
+        # ⚡ Bolt: Implement in-memory caching of the raw JSON string to avoid repeated file I/O.
+        # json.loads() creates a new dict, preventing state leakage without needing slow deepcopy().
+        mtime = os.path.getmtime(CACHE_FILE)
+        if _file_cache_string is not None and _file_cache_mtime == mtime:
+            return json.loads(_file_cache_string)
+
         with open(CACHE_FILE, 'r') as f:
-            return json.load(f)
+            data_str = f.read()
+
+        _file_cache_string = data_str
+        _file_cache_mtime = mtime
+        return json.loads(_file_cache_string)
     except Exception:
         return {}
 
