@@ -691,11 +691,20 @@ def update_settings():
         return jsonify({'error': 'Invalid request.'}), 400
 
     # 🛡️ Sentinel: Prevent mass assignment by plucking only allowed keys
+    # and validate types to prevent persistent DoS crashes downstream
     allowed_keys = ['sources', 'time_window_hours', 'personality', 'priority_sources', 'keywords']
     sanitized_settings = {}
     for key in allowed_keys:
         if key in new_settings:
-            sanitized_settings[key] = new_settings[key]
+            val = new_settings[key]
+            # Strict type validation
+            if key in ['sources', 'priority_sources', 'keywords'] and not isinstance(val, list):
+                return jsonify({'error': f"Invalid type for {key}. Expected a list."}), 400
+            if key == 'time_window_hours' and not isinstance(val, (int, float)):
+                return jsonify({'error': f"Invalid type for {key}. Expected a number."}), 400
+            if key == 'personality' and not isinstance(val, str):
+                return jsonify({'error': f"Invalid type for {key}. Expected a string."}), 400
+            sanitized_settings[key] = val
 
     user_info = get_user_info()
     email = user_info.get('email') if user_info else None

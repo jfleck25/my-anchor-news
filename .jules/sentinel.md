@@ -62,3 +62,8 @@
 **Vulnerability:** Endpoints that consume external APIs (like TTS generation) or database resources (like sharing briefings) lacked rate limits, leaving the application vulnerable to resource exhaustion and financial DoS attacks from authenticated users.
 **Learning:** Rate limiting is not just for primary data-fetching routes; it is crucial for *all* endpoints that perform intensive operations, call costly external APIs, or allocate storage, even if the user is authenticated.
 **Prevention:** Always apply rate limits (`@limiter.limit()`) to sensitive authenticated endpoints that consume significant resources or external quota.
+
+## 2026-04-23 - Persistent DoS via Missing Input Type Validation
+**Vulnerability:** The `/api/settings` POST endpoint plucked allowed keys from the incoming JSON payload but failed to validate their expected data types (e.g., ensuring `sources` is a list or `time_window_hours` is an integer/float). If an attacker provided a string where a list was expected, downstream processing logic (like `fetch_emails` iterating over `sources`) would crash, leading to a persistent Denial of Service state for the user until their settings were manually corrected.
+**Learning:** Checking for key presence (schema validation) is insufficient if the underlying data types are not strictly enforced. Type mismatch vulnerabilities can persist statefully and break core application functionality.
+**Prevention:** Always enforce strict type checking (e.g., `isinstance()`) on all user-supplied data fields in API endpoints before saving configuration state, ensuring it conforms to the application's expected structures.
