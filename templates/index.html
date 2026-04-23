@@ -86,7 +86,7 @@
         }
         
         .dark body {
-            background-color: #020617; /* slate-950 */
+            background-color: #0F172A; /* slate-900 */
         }
         
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -155,6 +155,7 @@
             Moon: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>,
             Sun: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>,
             Play: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
+            Pause: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>,
             Refresh: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>,
             Share: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>,
             Copy: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
@@ -455,27 +456,13 @@
         );
 
         const BriefingSkeleton = ({ stage }) => {
-            const steps = ['Scanning your inbox...', 'Comparing perspectives...', 'Synthesizing audio...'];
-            const activeIndex = stage.includes('inbox') ? 0 : stage.includes('Comparing') || stage.includes('Analyzing') ? 1 : 2;
             return (
-                <div className="max-w-md mx-auto py-20">
-                    <div className="space-y-6">
-                        {steps.map((s, i) => (
-                            <div key={i} className={`flex items-center gap-4 transition-opacity duration-300 ${i <= activeIndex ? 'opacity-100' : 'opacity-40'}`}>
-                                <div className="w-6 h-6 flex items-center justify-center shrink-0">
-                                    {i === activeIndex ? (
-                                        <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
-                                    ) : i < activeIndex ? (
-                                        <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
-                                    ) : (
-                                        <div className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-700"></div>
-                                    )}
-                                </div>
-                                <span className="font-mono text-xs uppercase tracking-widest font-bold text-slate-800 dark:text-slate-200">
-                                    {i === 0 && activeIndex === 0 ? stage : s}
-                                </span>
-                            </div>
-                        ))}
+                <div className="max-w-md mx-auto py-20 text-center">
+                    <div className="flex flex-col items-center gap-6">
+                        <div className="w-8 h-8 border-4 border-slate-200 border-t-amber-500 rounded-full animate-spin dark:border-slate-800 dark:border-t-amber-500"></div>
+                        <span className="font-mono text-xs uppercase tracking-widest font-bold text-slate-800 dark:text-slate-200 transition-all duration-500 ease-in-out">
+                            {stage}
+                        </span>
                     </div>
                 </div>
             );
@@ -536,6 +523,7 @@
         const Dashboard = ({ userInfo, sharedData, isMockSession }) => {
             const [analysis, setAnalysis] = React.useState(sharedData || null);
             const [audioSrc, setAudioSrc] = React.useState(null);
+            const [webSpeechActive, setWebSpeechActive] = React.useState(false);
             const [isFetching, setIsFetching] = React.useState(false);
             const [isGeneratingAudio, setIsGeneratingAudio] = React.useState(false);
             const [isPreloadingAudio, setIsPreloadingAudio] = React.useState(false);
@@ -555,11 +543,14 @@
                     return window.matchMedia('(prefers-color-scheme: dark)').matches;
                 } catch (e) { return false; }
             });
-            const [fetchStage, setFetchStage] = React.useState('Scanning your inbox…');
+            const [fetchStage, setFetchStage] = React.useState('Analyzing newsletters...');
             const [showTour, setShowTour] = React.useState(false);
             const tourCheckDone = React.useRef(false);
 
             const audioRef = React.useRef(null);
+            const [audioProgress, setAudioProgress] = React.useState(0);
+            const [audioDuration, setAudioDuration] = React.useState(0);
+            const [isPlaying, setIsPlaying] = React.useState(true);
             const prefetchIdRef = React.useRef(0);
             const prefetchPromiseRef = React.useRef(null);
 
@@ -569,7 +560,7 @@
                 try { localStorage.setItem('myanchor-dark-mode', String(darkMode)); } catch (e) {}
             }, [darkMode]);
 
-            const stages = ['Scanning your inbox…', 'Analyzing key stories…', 'Building your briefing…'];
+            const stages = ['Analyzing newsletters...', 'Structuring your briefing...'];
             React.useEffect(() => {
                 if (!isFetching) return;
                 setFetchStage(stages[0]);
@@ -577,7 +568,7 @@
                 const t = setInterval(() => {
                     i = (i + 1) % stages.length;
                     setFetchStage(stages[i]);
-                }, 2500);
+                }, 2000);
                 return () => clearInterval(t);
             }, [isFetching]);
 
@@ -645,6 +636,8 @@
                 setIsFetching(true);
                 setAnalysis(null);
                 setAudioSrc(null);
+                setWebSpeechActive(false);
+                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
                 setPreloadedAudio(null);
                 setIsPreloadingAudio(false);
                 setError(null);
@@ -762,9 +755,13 @@
                     // Web Speech API fallback (mock mode, no pre-generated MP3)
                     if (data.use_web_speech && data.script) {
                         if ('speechSynthesis' in window) {
+                            window.speechSynthesis.cancel();
                             const utt = new SpeechSynthesisUtterance(data.script);
-                            utt.rate = 1.0;
+                            utt.rate = playbackRate;
+                            utt.onend = () => setWebSpeechActive(false);
+                            utt.onerror = () => setWebSpeechActive(false);
                             window.speechSynthesis.speak(utt);
+                            setWebSpeechActive(true);
                         }
                         setIsGeneratingAudio(false);
                         return;
@@ -899,174 +896,193 @@
                     <html>
                     <head>
                         <title>My Anchor Briefing - ${today}</title>
+                        <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&display=swap" rel="stylesheet">
                         <style>
                             @media print {
-                                @page { margin: 1in; }
+                                @page { margin: 0.8in; }
+                                .story-headline { page-break-after: avoid; }
+                                .story-summary { page-break-before: avoid; }
+                            }
+                            * {
+                                box-sizing: border-box;
                             }
                             body {
-                                font-family: 'Georgia', serif;
+                                font-family: 'Geist', 'Inter', sans-serif;
                                 line-height: 1.6;
-                                color: #1e293b;
+                                color: #0f172a;
+                                background-color: #f8fafc;
                                 max-width: 800px;
                                 margin: 0 auto;
                                 padding: 40px 20px;
+                                -webkit-font-smoothing: antialiased;
                             }
                             .header {
-                                text-align: center;
-                                border-bottom: 3px solid #0ea5e9;
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: baseline;
+                                border-bottom: 2px solid #0f172a;
                                 padding-bottom: 20px;
                                 margin-bottom: 40px;
                             }
                             .header h1 {
-                                font-size: 32px;
-                                color: #0ea5e9;
-                                margin: 0 0 10px 0;
-                            }
-                            .header .subtitle {
-                                font-size: 14px;
-                                color: #64748b;
+                                font-family: 'Instrument Serif', serif;
                                 font-style: italic;
+                                font-size: 48px;
+                                font-weight: 400;
+                                color: #0f172a;
+                                margin: 0;
+                                letter-spacing: -0.02em;
                             }
                             .date {
-                                font-size: 16px;
-                                color: #475569;
-                                margin-top: 10px;
-                            }
-                            .section-title {
-                                font-size: 24px;
-                                color: #0f172a;
-                                border-bottom: 2px solid #e2e8f0;
-                                padding-bottom: 10px;
-                                margin: 30px 0 20px 0;
+                                font-family: 'Geist Mono', monospace;
+                                font-size: 12px;
+                                font-weight: bold;
+                                text-transform: uppercase;
+                                letter-spacing: 0.1em;
+                                color: #64748b;
                             }
                             .story {
-                                margin-bottom: 30px;
-                                page-break-inside: avoid;
-                            }
-                            .story-number {
-                                display: inline-block;
-                                background: #0ea5e9;
-                                color: white;
-                                width: 30px;
-                                height: 30px;
-                                border-radius: 50%;
-                                text-align: center;
-                                line-height: 30px;
-                                font-weight: bold;
-                                margin-right: 10px;
+                                margin-bottom: 60px;
                             }
                             .story-headline {
-                                font-size: 20px;
-                                font-weight: bold;
+                                font-family: 'Instrument Serif', serif;
+                                font-size: 36px;
+                                font-weight: 400;
+                                line-height: 1.1;
                                 color: #0f172a;
-                                margin-bottom: 10px;
+                                margin: 0 0 20px 0;
+                                letter-spacing: -0.02em;
                             }
                             .story-summary {
-                                font-size: 16px;
-                                color: #334155;
-                                margin-bottom: 15px;
-                                text-align: justify;
+                                font-size: 18px;
+                                color: #475569;
+                                margin-bottom: 30px;
+                                line-height: 1.7;
                             }
                             .perspectives {
-                                background: #f8fafc;
-                                border-left: 4px solid #0ea5e9;
-                                padding: 15px;
-                                margin-top: 10px;
-                            }
-                            .perspectives-title {
-                                font-size: 14px;
-                                font-weight: bold;
-                                color: #64748b;
-                                margin-bottom: 10px;
-                                text-transform: uppercase;
-                                letter-spacing: 0.5px;
+                                display: flex;
+                                flex-wrap: wrap;
+                                gap: 1px;
+                                background-color: #e2e8f0;
+                                border: 1px solid #e2e8f0;
+                                margin-bottom: 20px;
                             }
                             .perspective {
-                                font-size: 14px;
-                                color: #475569;
-                                margin-bottom: 8px;
-                                padding-left: 20px;
-                                position: relative;
+                                flex: 1 1 calc(50% - 1px);
+                                background-color: #ffffff;
+                                padding: 24px;
+                                min-width: 300px;
                             }
-                            .perspective::before {
-                                content: "▸";
-                                position: absolute;
-                                left: 0;
-                                color: #0ea5e9;
-                            }
-                            .source {
+                            .perspective .source {
+                                display: block;
+                                font-family: 'Geist Mono', monospace;
+                                font-size: 12px;
                                 font-weight: bold;
-                                color: #0ea5e9;
+                                text-transform: uppercase;
+                                letter-spacing: 0.1em;
+                                color: #f59e0b;
+                                margin-bottom: 12px;
+                            }
+                            .perspective .angle {
+                                font-size: 16px;
+                                color: #1e293b;
+                                margin: 0;
+                                line-height: 1.6;
+                            }
+                            .sources-list {
+                                font-family: 'Geist Mono', monospace;
+                                font-size: 12px;
+                                text-transform: uppercase;
+                                letter-spacing: 0.1em;
+                                color: #94a3b8;
+                                border-top: 1px solid #e2e8f0;
+                                padding-top: 16px;
+                                margin-top: 24px;
+                            }
+                            .in-brief-section {
+                                margin-top: 60px;
+                            }
+                            .in-brief-title {
+                                font-family: 'Instrument Serif', serif;
+                                font-size: 32px;
+                                font-weight: 400;
+                                color: #0f172a;
+                                border-bottom: 2px solid #0f172a;
+                                padding-bottom: 12px;
+                                margin-bottom: 24px;
                             }
                             .brief-items {
-                                columns: 2;
-                                column-gap: 30px;
+                                display: grid;
+                                grid-template-columns: 1fr 1fr;
+                                gap: 20px 40px;
                             }
                             .brief-item {
-                                font-size: 14px;
-                                color: #475569;
-                                margin-bottom: 10px;
-                                break-inside: avoid;
-                                padding-left: 20px;
-                                position: relative;
+                                display: flex;
+                                align-items: flex-start;
+                                gap: 12px;
                             }
-                            .brief-item::before {
-                                content: "•";
-                                position: absolute;
-                                left: 0;
-                                color: #0ea5e9;
-                                font-weight: bold;
+                            .brief-item .bullet {
+                                width: 6px;
+                                height: 6px;
+                                background-color: #0f172a;
+                                border-radius: 50%;
+                                margin-top: 10px;
+                                flex-shrink: 0;
+                            }
+                            .brief-item .text {
+                                font-size: 16px;
+                                color: #1e293b;
+                                line-height: 1.5;
                             }
                             .footer {
                                 text-align: center;
-                                margin-top: 50px;
-                                padding-top: 20px;
-                                border-top: 2px solid #e2e8f0;
+                                margin-top: 80px;
+                                padding-top: 40px;
+                                border-top: 1px solid #e2e8f0;
+                                font-family: 'Geist Mono', monospace;
                                 font-size: 12px;
+                                text-transform: uppercase;
+                                letter-spacing: 0.1em;
                                 color: #94a3b8;
                             }
                             .footer .logo {
-                                font-size: 18px;
                                 font-weight: bold;
-                                color: #0ea5e9;
-                                margin-bottom: 5px;
+                                color: #0f172a;
+                                margin-bottom: 8px;
                             }
                         </style>
                     </head>
                     <body>
                         <div class="header">
-                            <h1>MY ANCHOR</h1>
-                            <div class="subtitle">Your AI News Analyst</div>
+                            <h1>My Anchor</h1>
                             <div class="date">${today}</div>
                         </div>
                 `;
                 
                 // Top Stories
                 if (analysis.story_groups && analysis.story_groups.length > 0) {
-                    html += '<h2 class="section-title">📰 Top Stories</h2>';
-                    
                     analysis.story_groups.forEach((group, index) => {
                         html += `
                             <div class="story">
-                                <div class="story-headline">
-                                    <span class="story-number">${index + 1}</span>
-                                    ${escapeHtml(group.group_headline)}
-                                </div>
+                                <h2 class="story-headline">${escapeHtml(group.group_headline)}</h2>
                                 <div class="story-summary">${escapeHtml(group.consensus_summary || group.group_summary)}</div>
                         `;
                         
                         if (group.stories && group.stories.length > 0) {
                             html += '<div class="perspectives">';
-                            html += '<div class="perspectives-title">Source Perspectives</div>';
                             group.stories.forEach(story => {
-                                const source = story.source.split('<')[0].trim().replace('.com', '');
+                                const source = story.source.split('<')[0].trim().replace(/\.(com|co\.\w+)$/, '') || story.source;
                                 html += `
                                     <div class="perspective">
-                                        <span class="source">${escapeHtml(source)}:</span> ${escapeHtml(story.angle)}
+                                        <span class="source">${escapeHtml(source)}</span>
+                                        <p class="angle">"${escapeHtml(story.angle)}"</p>
                                     </div>
                                 `;
                             });
                             html += '</div>';
+                            
+                            const sourcesList = group.stories.map(s => s.source.split('<')[0].trim().replace(/\.(com|co\.\w+)$/, '')).join(', ');
+                            html += `<div class="sources-list">Verified Sources: ${escapeHtml(sourcesList)}</div>`;
                         }
                         
                         html += '</div>';
@@ -1075,12 +1091,18 @@
                 
                 // In Brief
                 if (analysis.remaining_stories && analysis.remaining_stories.length > 0) {
-                    html += '<h2 class="section-title">📌 In Brief</h2>';
+                    html += '<div class="in-brief-section">';
+                    html += '<h3 class="in-brief-title">In Brief</h3>';
                     html += '<div class="brief-items">';
                     analysis.remaining_stories.forEach(story => {
-                        html += `<div class="brief-item">${escapeHtml(story.headline)}</div>`;
+                        html += `
+                            <div class="brief-item">
+                                <div class="bullet"></div>
+                                <div class="text">${escapeHtml(story.headline)}</div>
+                            </div>
+                        `;
                     });
-                    html += '</div>';
+                    html += '</div></div>';
                 }
                 
                 // Footer
@@ -1119,6 +1141,48 @@
                 });
             };
 
+            const togglePlayPause = () => {
+                if (webSpeechActive && window.speechSynthesis) {
+                    if (window.speechSynthesis.paused) {
+                        window.speechSynthesis.resume();
+                        setIsPlaying(true);
+                    } else if (window.speechSynthesis.speaking) {
+                        window.speechSynthesis.pause();
+                        setIsPlaying(false);
+                    }
+                } else if (audioRef.current) {
+                    if (audioRef.current.paused) {
+                        audioRef.current.play();
+                    } else {
+                        audioRef.current.pause();
+                    }
+                }
+            };
+
+            const formatTime = (timeInSeconds) => {
+                if (isNaN(timeInSeconds) || timeInSeconds < 0) return "00:00";
+                const m = Math.floor(timeInSeconds / 60).toString().padStart(2, '0');
+                const s = Math.floor(timeInSeconds % 60).toString().padStart(2, '0');
+                return `${m}:${s}`;
+            };
+
+            const handleSeek = (e) => {
+                if (audioRef.current && audioDuration) {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const percent = Math.max(0, Math.min(1, x / rect.width));
+                    audioRef.current.currentTime = percent * audioDuration;
+                    setAudioProgress(percent * audioDuration);
+                }
+            };
+
+            const handleToggleSpeed = () => {
+                const speeds = [1.0, 1.25, 1.5, 2.0];
+                const currentIndex = speeds.indexOf(playbackRate);
+                const nextSpeed = speeds[(currentIndex + 1) % speeds.length];
+                setPlaybackRate(nextSpeed);
+            };
+
             // Keyboard shortcuts (R=Refresh, P=Play, S=Settings) — not when modal, tour, or typing in fields
             React.useEffect(() => {
                 if (sharedData) return;
@@ -1128,11 +1192,9 @@
                     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
                     const k = e.key?.toLowerCase();
                     if (e.key === ' ' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                        const audioEl = document.querySelector('audio');
-                        if (audioEl) {
+                        if (webSpeechActive || document.querySelector('audio')) {
                             e.preventDefault();
-                            if (audioEl.paused) audioEl.play();
-                            else audioEl.pause();
+                            togglePlayPause();
                         }
                     }
                     else if (k === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); handleFetchAndAnalyze(); }
@@ -1141,20 +1203,14 @@
                 };
                 document.addEventListener('keydown', onKey);
                 return () => document.removeEventListener('keydown', onKey);
-            }, [sharedData, isSettingsOpen, showTour, analysis]);
+            }, [sharedData, isSettingsOpen, showTour, analysis, webSpeechActive]);
 
-            const handleToggleSpeed = () => {
-                const speeds = [1.0, 1.25, 1.5, 2.0];
-                const currentIndex = speeds.indexOf(playbackRate);
-                const nextSpeed = speeds[(currentIndex + 1) % speeds.length];
-                setPlaybackRate(nextSpeed);
-            };
             return (
                 <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-40 sm:pb-32">
                     <a href="#main-content" className="absolute left-4 top-4 z-50 -translate-y-[200%] focus:translate-y-0 px-4 py-2 bg-slate-900 text-white font-medium rounded-lg shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-500 transition-transform">
                         Skip to main content
                     </a>
-                    <header className="max-w-[1200px] mx-auto px-4 sm:px-6 mt-16 mb-16 border-b-2 border-slate-900 dark:border-slate-100 pb-8 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
+                    <header className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-16 mb-16 border-b-2 border-slate-900 dark:border-slate-100 pb-8 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
                         <h1 className="font-display italic text-5xl sm:text-6xl text-slate-900 dark:text-white font-normal m-0 tracking-tight">
                             {sharedData ? "Shared Briefing" : "My Anchor"}
                         </h1>
@@ -1310,21 +1366,48 @@
                             Link copied to clipboard!
                         </div>
                     )}
-                    {audioSrc && !sharedData && (
-                        <div id="audio-player-bar" role="region" aria-label="Audio Player" className="fixed bottom-0 left-0 right-0 bg-slate-900 dark:bg-slate-950 p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] z-50 animate-[slideUp_0.3s_ease-out]">
-                            <div className="max-w-[1200px] mx-auto flex flex-col sm:flex-row sm:items-center gap-6">
-                                <button onClick={handleToggleSpeed} className="w-14 h-14 bg-amber-500 rounded-full flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-500" title={`Playback speed: ${playbackRate}x`}>
-                                    <Icons.Play />
-                                </button>
-                                <div className="flex-1 min-w-0 flex items-center gap-4">
-                                    <div className="waveform flex-1 opacity-80"></div>
-                                    <div className="font-mono text-xs text-slate-400 uppercase tracking-widest shrink-0">
-                                        00:00 / Audio
-                                    </div>
+                    {(audioSrc || webSpeechActive) && !sharedData && (
+                        <div id="audio-player-bar" role="region" aria-label="Audio Player" className="fixed bottom-0 left-0 right-0 bg-slate-900 dark:bg-slate-950 p-4 sm:p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] z-50 animate-[slideUp_0.3s_ease-out]">
+                            <div className="max-w-[1200px] mx-auto flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+                                <div className="flex items-center gap-4">
+                                    <button onClick={togglePlayPause} className="w-14 h-14 bg-amber-500 text-white rounded-full flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-500 shadow-md" title={isPlaying ? "Pause" : "Play"}>
+                                        {isPlaying ? <Icons.Pause /> : <Icons.Play />}
+                                    </button>
+                                    {webSpeechActive && (
+                                        <div className="font-mono text-xs text-amber-500 uppercase tracking-widest shrink-0 font-bold sm:hidden">
+                                            Live Synthesis
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex-1 min-w-0 flex flex-col justify-center gap-2">
+                                    {audioSrc ? (
+                                        <div className="flex items-center gap-4 w-full">
+                                            <span className="font-mono text-xs text-slate-400 w-10 text-right shrink-0">{formatTime(audioProgress)}</span>
+                                            <div className="flex-1 h-3 bg-slate-700 rounded-full cursor-pointer relative overflow-hidden group" onClick={handleSeek} role="slider" aria-valuemin="0" aria-valuemax={audioDuration} aria-valuenow={audioProgress} tabIndex="0">
+                                                <div className="absolute top-0 left-0 bottom-0 bg-amber-500 group-hover:bg-amber-400 transition-colors" style={{ width: `${audioDuration > 0 ? (audioProgress / audioDuration) * 100 : 0}%` }}></div>
+                                            </div>
+                                            <span className="font-mono text-xs text-slate-400 w-10 shrink-0">{formatTime(audioDuration)}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-4 w-full h-3">
+                                            <div className="waveform flex-1 opacity-80 animate-pulse"></div>
+                                        </div>
+                                    )}
                                     <div className="flex-1 min-w-0 absolute opacity-0 pointer-events-none">
-                                        <audio ref={audioRef} controls autoPlay src={audioSrc} className="w-full" />
+                                        {audioSrc && <audio ref={audioRef} autoPlay src={audioSrc} onTimeUpdate={(e) => setAudioProgress(e.target.currentTime)} onLoadedMetadata={(e) => setAudioDuration(e.target.duration)} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={() => setIsPlaying(false)} className="w-full" />}
                                     </div>
-                                    <button onClick={() => setAudioSrc(null)} className="h-10 w-10 flex items-center justify-center text-slate-400 hover:text-white rounded-full hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 shrink-0" aria-label="Close audio player">
+                                </div>
+                                <div className="flex items-center justify-end gap-2 shrink-0">
+                                    <button onClick={handleToggleSpeed} className="h-10 px-3 font-mono text-xs font-bold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Playback speed">
+                                        {playbackRate}x
+                                    </button>
+                                    {audioSrc && (
+                                        <a href={audioSrc} download={`MyAnchor_Briefing_${new Date().toISOString().split('T')[0]}.mp3`} className="h-10 w-10 flex items-center justify-center text-slate-300 hover:text-white rounded-full hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Download Audio">
+                                            <Icons.Download />
+                                        </a>
+                                    )}
+                                    <div className="w-px h-6 bg-slate-700 mx-1"></div>
+                                    <button onClick={() => { setAudioSrc(null); setWebSpeechActive(false); if ('speechSynthesis' in window) window.speechSynthesis.cancel(); setIsPlaying(false); }} className="h-10 w-10 flex items-center justify-center text-slate-400 hover:text-white rounded-full hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 shrink-0" aria-label="Close audio player" title="Close">
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                                     </button>
                                 </div>
