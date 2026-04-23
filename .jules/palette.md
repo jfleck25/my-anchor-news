@@ -11,3 +11,7 @@
 ## 2026-04-22 - Skip Links and Keyboard Accessibility
 **Learning:** When implementing 'skip-to-content' links, relying on standard 'sr-only' classes can sometimes cause unintended layout shifts or lack necessary interactivity when focused. Furthermore, the target container must be able to receive programmatic focus for screen readers to correctly resume context.
 **Action:** Use a reliable Tailwind positioning pattern (`absolute -translate-y-[200%] focus:translate-y-0`) to hide the link visually while ensuring it appears on focus. Always pair this with `id="content"`, `tabIndex="-1"`, and `focus:outline-none` on the target container (like `<main>`) to cleanly receive focus without a jarring visual ring.
+
+## 2026-04-23 - Scroll Restoration on Layout Collapse
+**Learning:** When users interact with actions that replace long, tall content (like a full news briefing) with short, compact content (like a loading skeleton), they are often left stranded at the bottom of the page, disoriented and unable to see the new loading state.
+**Action:** Always implement a `window.scrollTo({ top: 0, behavior: 'smooth' })` when initiating a major layout collapse or data refresh that replaces a tall container with a significantly shorter one, ensuring the user's viewport follows the UI context.
