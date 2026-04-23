@@ -61,6 +61,10 @@ else:
     posthog_client = None
 
 # --- Configuration & Constants ---
+MOCK_MODE = os.environ.get("MOCK_MODE", "false").lower() == "true"
+if MOCK_MODE:
+    print(" * [DEMO MODE] Google OAuth and API calls are bypassed.")
+
 app = flask.Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
@@ -265,7 +269,14 @@ def get_credentials_from_session(creds_data):
         return Credentials(**creds_data)
 
 def get_user_info():
-
+    # Demo mode: return a synthetic user profile
+    if session.get('is_mock_session'):
+        return {
+            'email': 'demo@myanchor.test',
+            'name': 'Demo User',
+            'picture': '',
+            'id': 'demo-user-001'
+        }
     if 'credentials' not in session:
         return None
     if 'user_info' in session:
@@ -294,6 +305,9 @@ def load_settings(user_email=None):
         "priority_sources": [],
         "keywords": []
     }
+    # In demo mode, never touch disk or DB — return in-memory defaults only
+    if user_email == "demo@myanchor.test":
+        return defaults
     
     if DATABASE_URL and user_email:
         try:
@@ -336,6 +350,9 @@ def load_settings(user_email=None):
         return defaults
 
 def save_settings(new_settings, user_email=None):
+    # In demo mode, never persist settings
+    if user_email == "demo@myanchor.test":
+        return True
     if DATABASE_URL and user_email:
         try:
             conn = get_db_connection()
@@ -382,12 +399,14 @@ if not PROJECT_ID:
     except: pass
 
 api_key = os.environ.get("GOOGLE_API_KEY")
-if api_key:
+if api_key and not MOCK_MODE:
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
     except Exception:
         model = None
+else:
+    model = None
 
 def sanitize_for_llm(text):
     text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
@@ -420,13 +439,18 @@ def generate_script_from_analysis(analysis_json, style="anchor"):
     
     story_groups = analysis_json.get('story_groups', [])
     for i, group in enumerate(story_groups):
-        script_parts.append(f"{group.get('group_headline', '')}. {group.get('group_summary', '')}. ")
+        script_parts.append(f"{group.get('group_headline', '')}. {group.get('consensus_summary', group.get('group_summary', ''))}. ")
         stories = group.get('stories', [])
         if len(stories) > 1:
-            script_parts.append("Perspectives: ")
+            script_parts.append("Differing perspectives: ")
             for story in stories:
                 source = story.get('source', 'One source').split('<')[0].strip().replace('.com', '')
                 script_parts.append(f"The {source} {story.get('angle', '')}. ")
+        elif len(stories) == 1:
+            story = stories[0]
+            source = story.get('source', 'One source').split('<')[0].strip().replace('.com', '')
+            script_parts.append(f"The {source} {story.get('angle', '')}. ")
+            
         if i < len(story_groups) - 1: script_parts.append(f" {random.choice(persona['transition'])} ")
             
     remaining = analysis_json.get('remaining_stories', [])
@@ -444,17 +468,31 @@ def analyze_news_with_llm(newsletters_text):
         return {"error": "Too much newsletter content to process at once. Please reduce your lookback window in settings."}
 
     prompt = """
-    You are an elite media analyst. Provide raw text from multiple newsletters.
+    You are an elite media analyst processing raw text from multiple newsletters.
     Task:
-    1. Group distinct news events.
-    2. Create neutral headlines.
-    3. Write 3-4 sentence summary of facts.
-    4. **DEEP ANGLE ANALYSIS**: 1-2 sentences per article. Include specific facts/data/quotes. Start with verb (e.g. "Cites...").
+    1. Group related stories from DIFFERENT newsletters into a single distinct news event.
+    2. Create a neutral headline for the group (`group_headline`).
+    3. Write a `consensus_summary`: A 3-4 sentence summary of the core facts that all sources agree on.
+    4. **DEEP ANGLE ANALYSIS (Perspective Split)**: For EACH individual source/story in the group, extract its specific perspective, unique facts, or how it differs from others into the `angle` field. (1-2 sentences. Start with a verb like "Argues...", "Cites...", "Reveals...").
     5. **Remaining Stories**: Top 5 only. One-sentence summary.
     6. **Filter**: Ignore ads/fluff.
     7. **Limit**: Top 10 groups max.
     
-    Output JSON: { "story_groups": [ { "group_headline": "...", "group_summary": "...", "stories": [ { "headline": "...", "source": "...", "angle": "..." } ] } ], "remaining_stories": [ { "headline": "..." } ] }
+    Output JSON format exactly:
+    {
+      "story_groups": [
+        {
+          "group_headline": "...",
+          "consensus_summary": "...",
+          "stories": [
+            { "headline": "...", "source": "...", "angle": "..." }
+          ]
+        }
+      ],
+      "remaining_stories": [
+        { "headline": "..." }
+      ]
+    }
     
     Content: ---
     """ + newsletters_text
@@ -612,7 +650,90 @@ def index():
         sentry_dsn_frontend=os.environ.get('SENTRY_DSN_FRONTEND', ''),
         posthog_api_key=os.environ.get('POSTHOG_API_KEY', ''),
         react_production=not app.debug,
+        mock_mode=MOCK_MODE,
     )
+
+# --- Mock / Demo Routes (no rate limiting, no real API calls) ---
+
+# Static mock briefing data served in demo mode
+_MOCK_BRIEFING = {
+    "story_groups": [
+        {
+            "group_headline": "Federal Reserve Signals Pause on Rate Hikes Amid Mixed Economic Data",
+            "group_summary": "The Federal Reserve indicated it may hold interest rates steady at its next meeting, citing cooling inflation but persistent labor market strength. Officials noted that recent GDP figures came in below expectations, adding uncertainty to the path forward. Markets rallied on the news, with the S&P 500 closing up 1.2%.",
+            "stories": [
+                {"headline": "Fed Officials Signal Rate Pause", "source": "wsj.com", "angle": "Emphasizes hawkish dissent from two regional Fed presidents who pushed for another 25bps hike."},
+                {"headline": "Markets Cheer Fed Pivot Signal", "source": "nytimes.com", "angle": "Focuses on investor relief and notes that bond yields fell sharply following the announcement."}
+            ]
+        },
+        {
+            "group_headline": "OpenAI Launches GPT-5 with Real-Time Reasoning Capabilities",
+            "group_summary": "OpenAI unveiled GPT-5, its most powerful model to date, featuring native real-time reasoning and a dramatically expanded context window of one million tokens. The release sparked immediate comparisons to Google's Gemini Ultra and raised new questions about AI safety benchmarks. Enterprise pricing starts at $60 per million output tokens.",
+            "stories": [
+                {"headline": "GPT-5 Arrives with Landmark Reasoning", "source": "techcrunch.com", "angle": "Details the model's new 'chain-of-thought' transparency features that show users how it arrives at answers."},
+                {"headline": "AI Arms Race Intensifies with GPT-5 Drop", "source": "theguardian.com", "angle": "Raises ethical concerns about the accelerating pace of deployment without sufficient safety evaluation."}
+            ]
+        },
+        {
+            "group_headline": "Apple Reports Record Services Revenue, iPhone Sales Disappoint",
+            "group_summary": "Apple's Q2 earnings beat on services, with the segment reaching $26 billion in revenue driven by App Store and Apple TV+ growth. However, iPhone unit sales fell 8% year-over-year amid competition in China from Huawei. The company announced an additional $90 billion share buyback program.",
+            "stories": [
+                {"headline": "Apple Services Hit Record High", "source": "wsj.com", "angle": "Notes that services now represent 28% of total revenue, a milestone that validates CEO Tim Cook's platform strategy."},
+                {"headline": "iPhone Slump Clouds Apple's Quarter", "source": "axios.com", "angle": "Highlights that the China market decline is structural, not cyclical, citing Huawei's Mate 60 Pro as a direct threat."}
+            ]
+        }
+    ],
+    "remaining_stories": [
+        {"headline": "Tesla announces next-generation Supercharger network expansion across Europe."},
+        {"headline": "UK inflation drops to 2.3%, its lowest level in three years."},
+        {"headline": "Amazon Web Services wins $10B Pentagon cloud contract extension."},
+        {"headline": "Spotify reports first full year of profitability, shares surge 15%."},
+        {"headline": "Boeing 737 MAX production halted again following FAA audit findings."}
+    ]
+}
+
+@app.route('/api/mock_login')
+def mock_login():
+    """Sets up a demo session without requiring Google OAuth."""
+    if not MOCK_MODE:
+        return jsonify({'error': 'Demo mode is not enabled.'}), 403
+    session.clear()
+    session['is_mock_session'] = True
+    session['user_email'] = 'demo@myanchor.test'
+    return redirect('/')
+
+@app.route('/api/mock/fetch')
+def mock_fetch_emails():
+    """Returns static mock briefing data. No rate limit, no Gmail API calls."""
+    if not MOCK_MODE:
+        return jsonify({'error': 'Demo mode is not enabled.'}), 403
+    if not session.get('is_mock_session'):
+        return jsonify({'error': 'Not a demo session.'}), 401
+    # Simulate a brief delay so the loading UI plays out naturally
+    time.sleep(1.5)
+    return jsonify(_MOCK_BRIEFING)
+
+@app.route('/api/mock/audio', methods=['POST'])
+def mock_generate_audio():
+    """Returns pre-generated demo audio as base64. No rate limit, no TTS API calls."""
+    if not MOCK_MODE:
+        return jsonify({'error': 'Demo mode is not enabled.'}), 403
+    if not session.get('is_mock_session'):
+        return jsonify({'error': 'Not a demo session.'}), 401
+    # Serve the pre-generated demo MP3 if it exists
+    demo_audio_path = os.path.join(os.path.dirname(__file__), 'static', 'demo_briefing.mp3')
+    if os.path.exists(demo_audio_path):
+        with open(demo_audio_path, 'rb') as f:
+            audio_base64 = base64.b64encode(f.read()).decode('utf-8')
+        return jsonify({'audio_content': audio_base64})
+    # Fallback: signal the frontend to use Web Speech API
+    return jsonify({'use_web_speech': True, 'script': _get_mock_script()}), 200
+
+def _get_mock_script():
+    """Generates a TTS script from the mock briefing for Web Speech API fallback."""
+    return generate_script_from_analysis(_MOCK_BRIEFING, style='anchor')
+
+# --- Real Google OAuth Routes ---
 
 @app.route('/login')
 def login():
@@ -682,11 +803,14 @@ def logout():
 @app.route('/api/check_auth')
 def check_auth():
     user_info = get_user_info()
-    return jsonify({'logged_in': True, 'user': user_info}) if user_info else jsonify({'logged_in': False})
+    is_mock = bool(session.get('is_mock_session'))
+    if user_info:
+        return jsonify({'logged_in': True, 'user': user_info, 'is_mock_session': is_mock})
+    return jsonify({'logged_in': False})
 
 @app.route('/api/settings', methods=['GET'])
 def get_settings():
-    if 'credentials' not in session:
+    if 'credentials' not in session and not session.get('is_mock_session'):
         return jsonify({'error': 'Please log in to view your settings.'}), 401
     try:
         user_info = get_user_info()
@@ -698,7 +822,7 @@ def get_settings():
 
 @app.route('/api/settings', methods=['POST'])
 def update_settings():
-    if 'credentials' not in session: 
+    if 'credentials' not in session and not session.get('is_mock_session'): 
         return jsonify({'error': 'Please log in to save your settings.'}), 401
     new_settings = request.get_json()
     if not isinstance(new_settings, dict):
@@ -965,7 +1089,7 @@ def generate_audio():
 @app.route('/api/share', methods=['POST'])
 @limiter.limit("20 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit of 20 shared briefings.")
 def share_briefing():
-    if 'credentials' not in session: return jsonify({'error': 'User not authenticated'}), 401
+    if 'credentials' not in session and not session.get('is_mock_session'): return jsonify({'error': 'User not authenticated'}), 401
     data = request.get_json()
     if not isinstance(data, dict):
         return jsonify({'error': 'Invalid data format. Expected a JSON object.'}), 400
