@@ -697,6 +697,28 @@ def update_settings():
         if key in new_settings:
             sanitized_settings[key] = new_settings[key]
 
+    # 🛡️ Sentinel: Add type and length validation to prevent DoS and injection
+    if 'time_window_hours' in sanitized_settings:
+        try:
+            hours = int(sanitized_settings['time_window_hours'])
+            if hours < 1 or hours > 168: raise ValueError()
+            sanitized_settings['time_window_hours'] = hours
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid time_window_hours. Must be an integer between 1 and 168.'}), 400
+
+    if 'personality' in sanitized_settings:
+        if not isinstance(sanitized_settings['personality'], str):
+            return jsonify({'error': 'Invalid personality format.'}), 400
+        sanitized_settings['personality'] = sanitized_settings['personality'][:50]
+
+    for list_key in ['sources', 'priority_sources', 'keywords']:
+        if list_key in sanitized_settings:
+            val = sanitized_settings[list_key]
+            if not isinstance(val, list) or not all(isinstance(i, str) for i in val):
+                return jsonify({'error': f'Invalid {list_key}. Must be a list of strings.'}), 400
+            # Limit length of list and items
+            sanitized_settings[list_key] = [i[:100] for i in val[:50]]
+
     user_info = get_user_info()
     email = user_info.get('email') if user_info else None
     if save_settings(sanitized_settings, email):
