@@ -867,17 +867,22 @@ def generate_audio():
 
         sentences = re.split(r'(?<=[.!?])\s+', script_text)
         chunks = []
-        current_chunk = ""
+        # ⚡ Bolt: Use string builder pattern and running counter to avoid O(N^2) memory/encoding overhead
+        current_chunk_parts = []
+        current_chunk_byte_len = 0
         byte_limit = 4800
         for sentence in sentences:
-            if len(current_chunk.encode('utf-8')) + len(sentence.encode('utf-8')) + 1 < byte_limit:
-                current_chunk += sentence + " "
+            sentence_byte_len = len(sentence.encode('utf-8'))
+            if current_chunk_byte_len + sentence_byte_len + 1 < byte_limit:
+                current_chunk_parts.append(sentence)
+                current_chunk_byte_len += sentence_byte_len + 1
             else:
-                if current_chunk:
-                    chunks.append(current_chunk)
-                current_chunk = sentence + " "
-        if current_chunk:
-            chunks.append(current_chunk)
+                if current_chunk_parts:
+                    chunks.append(" ".join(current_chunk_parts) + " ")
+                current_chunk_parts = [sentence]
+                current_chunk_byte_len = sentence_byte_len + 1
+        if current_chunk_parts:
+            chunks.append(" ".join(current_chunk_parts) + " ")
 
         worker_args = [(i, chunk_text, creds_dict, style, PROJECT_ID) for i, chunk_text in enumerate(chunks)]
         t_start = time.time()
