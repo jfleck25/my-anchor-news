@@ -57,3 +57,8 @@
 **Vulnerability:** The `oauth2callback` endpoint retrieved the OAuth `state` parameter from the user's session using `state = session['state']` but failed to pop it from the session. This leaves the `state` parameter in the session, allowing it to potentially be reused.
 **Learning:** Failing to remove single-use tokens (like OAuth state) from session storage after their first use leaves them vulnerable to replay attacks if an attacker intercepts an authorization response.
 **Prevention:** Always use `session.pop('key')` instead of `session['key']` when retrieving single-use security tokens from session storage to ensure they are immediately invalidated.
+
+## $(date +%Y-%m-%d) - Missing Content Security Policy (CSP) Header
+**Vulnerability:** The application was setting several security headers (like HSTS and X-Frame-Options) but failed to set a Content-Security-Policy (CSP) header, leaving it vulnerable to Cross-Site Scripting (XSS) and other injection attacks.
+**Learning:** Even if a modern frontend framework (like React) is used, relying solely on it to prevent XSS is insufficient. A CSP acts as a crucial defense-in-depth layer, restricting the sources from which scripts, styles, and other resources can be loaded or executed, significantly mitigating the impact of any potential injection flaws.
+**Prevention:** Always implement a restrictive Content-Security-Policy header, explicitly defining allowlists for trusted sources and avoiding permissive directives like `unsafe-inline` or `unsafe-eval` unless strictly necessary and carefully reviewed.

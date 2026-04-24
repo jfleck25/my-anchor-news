@@ -1,10 +1,5 @@
-💡 What: Added visual loading states and prevented inappropriate button scaling when disabled. Specifically:
-- Added a spinning icon indicator to the "Refresh" and "Play Briefing" buttons when async operations are running.
-- Hid keyboard shortcut `<kbd>` hints on these buttons while in a loading state to reduce visual noise.
-- Added `disabled:hover:scale-100` and `disabled:cursor-not-allowed` to interactive buttons with scale effects (like the main "Get my briefing" button) to prevent them from visually scaling up when hovered in a disabled state.
-
-🎯 Why: To provide better feedback during async operations (loading/fetching states) and to avoid misleading visual hover scaling on disabled buttons.
-
-📸 Before/After: Visual improvements on loading states and disabled hovering.
-
-♿ Accessibility: The buttons now offer clear cursor-not-allowed indications when disabled, alongside screen reader compatible dynamic loading text.
+🚨 Severity: MEDIUM
+💡 Vulnerability: The application previously did not set a Content-Security-Policy (CSP) header in `add_security_headers`, leaving the React frontend relying solely on default framework protections. Without a strict CSP, XSS or injection vulnerabilities could compromise the user session and data.
+🎯 Impact: This acts as a robust defense-in-depth layer. If any other vulnerability in the application allowed an attacker to inject scripts into the DOM, the browser would execute them. A CSP restricts which domains and sources can execute scripts, fetch data, or apply styles.
+🔧 Fix: Added `response.headers['Content-Security-Policy']` to the `add_security_headers` middleware in `main.py`. The policy explicitly whitelists only trusted domains required by the app (e.g., Tailwind CSS, React via unpkg, Sentry, and PostHog) while restricting standard origins to `self`.
+✅ Verification: Tested the application locally with `python3 test_security.py` to ensure core API passes. Validated UI functionality with Node puppeteer tests (`node tests/test_ui.js`) to confirm the CSP does not break React mounting or external resource fetching.
