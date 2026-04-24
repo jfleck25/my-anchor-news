@@ -1,5 +1,9 @@
-🚨 **Severity**: MEDIUM
-💡 **Vulnerability**: The `/api/settings` POST endpoint lacked strict data type validation when extracting allowed keys from incoming JSON payloads. This exposed the application to type mismatches.
-🎯 **Impact**: An attacker or errant client could inject unexpected types (like a string instead of a list of sources) causing a persistent Denial of Service state, as downstream functions (`fetch_emails`) would crash while trying to process the malformed configuration.
-🔧 **Fix**: Enhanced the key-plucking mechanism in `update_settings` to explicitly validate the types of `sources`, `time_window_hours`, `personality`, `priority_sources`, and `keywords` using `isinstance()`, rejecting mismatches with a 400 Bad Request error.
-✅ **Verification**: Run `python3 test_security.py` and `python3 -m pytest tests/` to confirm that valid JSON structures succeed while type mismatches are correctly rejected without overwriting the settings payload.
+🎯 **What:** The `analyze_news_with_llm` function was heavily bloated, containing both the massive, multi-line string for constructing the AI prompt and the complex logic necessary to extract and validate JSON responses from the raw Gemini API output. These concerns have been extracted into two private helper functions: `_build_analysis_prompt` and `_parse_llm_response`.
+
+💡 **Why:** This refactoring significantly improves the readability and maintainability of the main module. By separating the string construction and output parsing logic, the core `analyze_news_with_llm` function becomes much shorter and is now solely focused on handling high-level API orchestration, validation, and error management. This makes it easier to test prompt changes or JSON parsing rules independently in the future.
+
+✅ **Verification:**
+1. Manually verified the helper extractions via `grep` and source code inspection.
+2. The core unit tests (`test_main.py` and `test_security.py`) were executed and verified to pass, confirming that application routing and global mocks continue to work properly. All previous exception-catching blocks and API behaviors are preserved intact.
+
+✨ **Result:** The `analyze_news_with_llm` function is significantly cleaner, reducing cognitive load for future maintenance while fully preserving its existing capability and error-handling flow.

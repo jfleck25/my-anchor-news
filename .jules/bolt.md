@@ -1,3 +1,7 @@
+## 2026-04-24 - Extract Complex LLM Prompt Building and Parsing to Helpers
+**Learning:** The `analyze_news_with_llm` function in `main.py` was overly long and complex, embedding both the massive prompt string construction and the complex logic to interpret Google Gemini's varying finish reasons and regex-extract JSON directly into the main try/catch control flow. This made the core API orchestration hard to read and reason about.
+**Action:** Extract large, static or semi-static string constructions into `_build_prompt` style helper functions. Extract complex validation, extraction, and mapping logic (like interpreting model response finish reasons) into `_parse_response` style helpers. This keeps the primary orchestration function concise and focused solely on error boundaries and control flow.
+
 ## 2024-04-07 - Avoid Google API Discovery Document for Simple Calls
 **Learning:** Initializing a Google API service via `googleapiclient.discovery.build()` introduces substantial network latency because it fetches and parses the API's discovery document before making the actual request. This is particularly problematic for simple REST operations like fetching user info during authentication checks.
 **Action:** Replace `build('oauth2', 'v2')` with direct REST API requests using `google.auth.transport.requests.AuthorizedSession(credentials)` for simple operations. This avoids the discovery overhead while preserving automatic OAuth2 token refreshment.
