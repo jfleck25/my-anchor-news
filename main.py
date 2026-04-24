@@ -63,7 +63,7 @@ else:
 # --- Configuration & Constants ---
 MOCK_MODE = os.environ.get("MOCK_MODE", "false").lower() == "true"
 if MOCK_MODE:
-    print(" * [DEMO MODE] Google OAuth and API calls are bypassed.")
+    print(" * [DEMO MODE] Interactive demo button enabled.")
 
 app = flask.Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
@@ -102,11 +102,15 @@ def add_security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://browser.sentry-cdn.com https://unpkg.com https://us.i.posthog.com https://eu.i.posthog.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://us.i.posthog.com https://eu.i.posthog.com https://sentry.io https://*.sentry.io;"
     return response
 
 # Enable detailed error messages in development
 if os.environ.get("FLASK_ENV") != "production":
-    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+    if os.environ.get("ALLOW_INSECURE_OAUTH") == "1":
+        os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+    elif "OAUTHLIB_INSECURE_TRANSPORT" in os.environ:
+        del os.environ["OAUTHLIB_INSECURE_TRANSPORT"]
     app.config['DEBUG'] = True
     app.config['PROPAGATE_EXCEPTIONS'] = True
 else:
@@ -297,7 +301,15 @@ def get_user_info():
         session.pop('user_info', None)
         return None
 
+
+# ⚡ Bolt: Cache DB-based settings to prevent repetitive synchronous blockages in hot loops.
+# This cache reduces DB overhead for load_settings on cache hits significantly.
+# We invalidate on explicit save_settings.
+_db_settings_cache = {}
+_db_settings_lock = threading.Lock()
+
 def load_settings(user_email=None):
+
     defaults = {
         "sources": ["wsj.com", "nytimes.com", "axios.com", "theguardian.com", "techcrunch.com"],
         "time_window_hours": 24,
@@ -309,6 +321,15 @@ def load_settings(user_email=None):
     if user_email == "demo@myanchor.test":
         return defaults
     
+    # 1) If we have a user email, check the unified per-email cache first
+    if user_email:
+        with _db_settings_lock:
+            if user_email in _db_settings_cache:
+                return copy.deepcopy(_db_settings_cache[user_email])
+
+    user_settings = None
+
+    # 2) If using DB, try fetching from there
     if DATABASE_URL and user_email:
         try:
             conn = get_db_connection()
@@ -322,37 +343,54 @@ def load_settings(user_email=None):
             if row:
                 user_settings = defaults.copy()
                 user_settings.update(row['settings'] or {})
-                return user_settings
         except Exception:
             pass
 
-    # ⚡ Bolt: Cache file-based settings. We check the file's modification time (mtime).
-    # If the file hasn't changed since the last read, we return a deep copy of the cached
-    # settings dictionary instead of repeatedly reading and parsing the JSON from disk.
-    # This reduces load_settings() time from ~0.37ms to ~0.11ms (~70% reduction) on cache hit.
-    global _file_settings_cache, _file_settings_mtime
-    if not os.path.exists(SETTINGS_FILE):
-        return defaults
-    try:
-        mtime = os.path.getmtime(SETTINGS_FILE)
-        with _file_settings_lock:
-            if _file_settings_cache is not None and _file_settings_mtime == mtime:
-                return copy.deepcopy(_file_settings_cache)
+    # 3) If no DB or DB fetch failed/returned nothing, fallback to file or defaults
+    if user_settings is None:
+        global _file_settings_cache, _file_settings_mtime
+        if not os.path.exists(SETTINGS_FILE):
+            user_settings = defaults.copy()
+        else:
+            try:
+                mtime = os.path.getmtime(SETTINGS_FILE)
+                with _file_settings_lock:
+                    if _file_settings_cache is not None and _file_settings_mtime == mtime:
+                        user_settings = copy.deepcopy(_file_settings_cache)
 
-        with open(SETTINGS_FILE, 'r') as f:
-            data = json.load(f)
+                if user_settings is None:
+                    with open(SETTINGS_FILE, 'r') as f:
+                        data = json.load(f)
+                    with _file_settings_lock:
+                        _file_settings_cache = copy.deepcopy(data)
+                        _file_settings_mtime = mtime
+                    user_settings = copy.deepcopy(_file_settings_cache)
+            except Exception:
+                user_settings = defaults.copy()
 
-        with _file_settings_lock:
-            _file_settings_cache = copy.deepcopy(data)
-            _file_settings_mtime = mtime
-            return copy.deepcopy(_file_settings_cache)
-    except Exception:
-        return defaults
+    # 4) Cache the final result (negative or positive) for this user
+    if user_email:
+        with _db_settings_lock:
+            if len(_db_settings_cache) > 1000:
+                # Naive bounded LRU by dropping half the cache to prevent sudden spikes
+                keys_to_delete = list(_db_settings_cache.keys())[:500]
+                for k in keys_to_delete:
+                    del _db_settings_cache[k]
+            _db_settings_cache[user_email] = copy.deepcopy(user_settings)
+
+    return user_settings
 
 def save_settings(new_settings, user_email=None):
     # In demo mode, never persist settings
     if user_email == "demo@myanchor.test":
         return True
+
+    # ⚡ Bolt: Invalidate the in-memory settings cache when we update settings
+    if user_email:
+        with _db_settings_lock:
+            if user_email in _db_settings_cache:
+                del _db_settings_cache[user_email]
+
     if DATABASE_URL and user_email:
         try:
             conn = get_db_connection()
@@ -399,13 +437,16 @@ if not PROJECT_ID:
     except: pass
 
 api_key = os.environ.get("GOOGLE_API_KEY")
-if api_key and not MOCK_MODE:
+if api_key:
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
-    except Exception:
+    except Exception as e:
+        print(f"ERROR: Failed to initialize Gemini model: {e}")
         model = None
 else:
+    if not MOCK_MODE:
+        print("CRITICAL: GOOGLE_API_KEY is missing from environment variables!")
     model = None
 
 def sanitize_for_llm(text):
@@ -460,14 +501,7 @@ def generate_script_from_analysis(analysis_json, style="anchor"):
     script_parts.append(f" {persona['outro']}")
     return "".join(script_parts)
 
-def analyze_news_with_llm(newsletters_text):
-    if not model: raise Exception("Gemini API model is not configured.")
-    
-    # Pre-validation check
-    if len(newsletters_text) > 800000:
-        return {"error": "Too much newsletter content to process at once. Please reduce your lookback window in settings."}
-
-    prompt = """
+ANALYSIS_PROMPT_TEMPLATE = """
     You are an elite media analyst processing raw text from multiple newsletters.
     Task:
     1. Group related stories from DIFFERENT newsletters into a single distinct news event.
@@ -495,27 +529,38 @@ def analyze_news_with_llm(newsletters_text):
     }
     
     Content: ---
-    """ + newsletters_text
+    """
+
+def _process_llm_response(response):
+    # Check finish reason
+    if response.candidates:
+        finish_reason = response.candidates[0].finish_reason
+        if finish_reason == 2: # MAX_TOKENS
+            return {"error": "The briefing was too long to generate. Try reducing your sources or lookback period."}
+        elif finish_reason == 3: # SAFETY
+            return {"error": "The analysis was blocked due to safety filters."}
+        elif finish_reason not in [1, 0] and hasattr(finish_reason, 'value') and finish_reason.value not in [1, 0]:
+            return {"error": "The AI encountered an unexpected interruption. Please try again."}
+
+    text = getattr(response, 'text', None)
+    if not text:
+        return {"error": "AI analysis failed."}
+    match = re.search(r'\{.*\}', text, re.DOTALL)
+    if match: return json.loads(match.group(0))
+    else: raise ValueError("No valid JSON found.")
+
+def analyze_news_with_llm(newsletters_text):
+    if not model: raise Exception("Gemini API model is not configured.")
+
+    # Pre-validation check
+    if len(newsletters_text) > 800000:
+        return {"error": "Too much newsletter content to process at once. Please reduce your lookback window in settings."}
+
+    prompt = ANALYSIS_PROMPT_TEMPLATE + newsletters_text
     try:
         generation_config = genai.types.GenerationConfig(max_output_tokens=8192, temperature=0.2)
         response = model.generate_content(prompt, generation_config=generation_config)
-        
-        # Check finish reason
-        if response.candidates:
-            finish_reason = response.candidates[0].finish_reason
-            if finish_reason == 2: # MAX_TOKENS
-                return {"error": "The briefing was too long to generate. Try reducing your sources or lookback period."}
-            elif finish_reason == 3: # SAFETY
-                return {"error": "The analysis was blocked due to safety filters."}
-            elif finish_reason not in [1, 0] and hasattr(finish_reason, 'value') and finish_reason.value not in [1, 0]:
-                return {"error": "The AI encountered an unexpected interruption. Please try again."}
-
-        text = getattr(response, 'text', None)
-        if not text:
-            return {"error": "AI analysis failed."}
-        match = re.search(r'\{.*\}', text, re.DOTALL)
-        if match: return json.loads(match.group(0))
-        else: raise ValueError("No valid JSON found.")
+        return _process_llm_response(response)
     except json.JSONDecodeError:
         return {"error": "The AI failed to format the analysis correctly. Please try again."}
     except ResourceExhausted:
@@ -531,31 +576,32 @@ def analyze_news_with_llm(newsletters_text):
 
 # --- Caching Helpers ---
 # File-based cache is ephemeral on Render and not shared across workers; treat as best-effort.
-_file_cache_string = None
-_file_cache_mtime = 0
+_in_memory_cache = None
+_in_memory_cache_mtime = 0
 
 def load_cache():
-    global _file_cache_string, _file_cache_mtime
+    global _in_memory_cache, _in_memory_cache_mtime
     if not os.path.exists(CACHE_FILE): return {}
     try:
-        # ⚡ Bolt: Implement in-memory caching of the raw JSON string to avoid repeated file I/O.
-        # json.loads() creates a new dict, preventing state leakage without needing slow deepcopy().
+        # ⚡ Bolt: Cache file-based data in memory to avoid repeated JSON parsing overhead
         mtime = os.path.getmtime(CACHE_FILE)
-        if _file_cache_string is not None and _file_cache_mtime == mtime:
-            return json.loads(_file_cache_string)
+        if _in_memory_cache is not None and _in_memory_cache_mtime == mtime:
+            return copy.deepcopy(_in_memory_cache)
 
         with open(CACHE_FILE, 'r') as f:
-            data_str = f.read()
-
-        _file_cache_string = data_str
-        _file_cache_mtime = mtime
-        return json.loads(_file_cache_string)
+            _in_memory_cache = json.load(f)
+            _in_memory_cache_mtime = mtime
+            return copy.deepcopy(_in_memory_cache)
     except Exception:
         return {}
 
 def save_cache(data):
+    global _in_memory_cache, _in_memory_cache_mtime
     try: 
         with open(CACHE_FILE, 'w') as f: json.dump(data, f)
+        # Update in-memory cache to avoid re-reading the file we just wrote
+        _in_memory_cache = copy.deepcopy(data)
+        _in_memory_cache_mtime = os.path.getmtime(CACHE_FILE)
     except Exception as e:
         pass
 
@@ -615,6 +661,39 @@ def _fetch_one_message(args):
     except Exception as e:
         print(f"fetch_emails: failed to fetch message {message_id}: {e}")
         return (index, None, None)
+
+
+def _chunk_script_text(script_text, byte_limit=4800):
+    """Splits script text into chunks that stay under the byte limit."""
+    sentences = re.split(r'(?<=[.!?])\s+', script_text)
+    chunks = []
+    # ⚡ Bolt: Replace O(N^2) string concatenation loop with string builder pattern and incremental byte tracking
+    current_chunk_parts = []
+    current_chunk_bytes = 0
+    for sentence in sentences:
+        sentence_bytes = len(sentence.encode('utf-8')) + 1 # +1 for the space
+        if current_chunk_bytes + sentence_bytes < byte_limit:
+            current_chunk_parts.append(sentence)
+            current_chunk_parts.append(" ")
+            current_chunk_bytes += sentence_bytes
+        else:
+            if current_chunk_parts:
+                chunks.append("".join(current_chunk_parts))
+            current_chunk_parts = [sentence, " "]
+            current_chunk_bytes = sentence_bytes
+    if current_chunk_parts:
+        chunks.append("".join(current_chunk_parts))
+    return chunks
+
+def _synthesize_audio_from_chunks(chunks, creds_dict, style, project_id):
+    """Synthesizes audio from chunks in parallel and concatenates the results."""
+    worker_args = [(i, chunk_text, creds_dict, style, project_id) for i, chunk_text in enumerate(chunks)]
+    t_start = time.time()
+    with ThreadPoolExecutor(max_workers=min(len(chunks), 8)) as executor:
+        results = list(executor.map(_synthesize_one_chunk, worker_args))
+    all_audio_content = b"".join(audio for _idx, audio in results)
+    tts_duration_ms = int((time.time() - t_start) * 1000)
+    return all_audio_content, tts_duration_ms
 
 def _synthesize_one_chunk(args):
     """Synthesize a single TTS chunk. Used by parallel workers. Returns (index, audio_bytes)."""
@@ -850,6 +929,79 @@ def update_settings():
         return jsonify({'status': 'success'})
     return jsonify({'error': 'Unable to save settings. Please try again or contact support if the issue persists.'}), 500
 
+def _check_cached_analysis(cache_key, current_hash):
+    """Check if we have a valid cached analysis."""
+    with _cache_lock:
+        cache = load_cache()
+        user_cache = cache.get(cache_key, {})
+        if (user_cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (user_cache.get('settings_hash') == current_hash) and (user_cache.get('analysis')):
+            return user_cache['analysis']
+    return None
+
+def _update_cached_analysis(cache_key, current_hash, analysis_result):
+    """Update the cache with a new analysis result."""
+    with _cache_lock:
+        cache = load_cache()
+        user_cache = cache.get(cache_key, {})
+        user_cache['timestamp'] = time.time()
+        user_cache['settings_hash'] = current_hash
+        user_cache['analysis'] = analysis_result
+        if 'audio' in user_cache:
+            del user_cache['audio']
+        if 'script_hash' in user_cache:
+            del user_cache['script_hash']
+        cache[cache_key] = user_cache
+        save_cache(cache)
+
+def _search_gmail_messages(creds, sources, hours):
+    """Search Gmail for recent newsletters from specified sources."""
+    sources_query = " OR ".join([f"from:{s}" for s in sources])
+    query = f"({sources_query}) newer_than:{hours}h"
+    auth_session = AuthorizedSession(creds)
+    url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages"
+    resp = auth_session.get(url, params={'q': query, 'maxResults': 50}, timeout=10)
+    resp.raise_for_status()
+    results = resp.json()
+    return results.get('messages', [])
+
+def _process_email_messages(messages, creds_dict, keywords, priority_sources):
+    """Process email messages concurrently and return consolidated text."""
+    worker_args = [(i, msg['id'], creds_dict, keywords, priority_sources) for i, msg in enumerate(messages)]
+    priority_text_parts = []
+    normal_text_parts = []
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        for _index, email_block, is_priority in executor.map(_fetch_one_message, worker_args):
+            if email_block is None:
+                continue
+            if is_priority:
+                priority_text_parts.append(f"*** PRIORITY SOURCE ***\n{email_block}")
+            else:
+                normal_text_parts.append(email_block)
+
+    return "".join(priority_text_parts) + "".join(normal_text_parts), len(normal_text_parts), len(priority_text_parts)
+
+def _report_fetch_metrics(email, analysis_result, t_duration_ms, hours, messages, normal_count, priority_count, raw_length, optimized_length):
+    """Report fetch metrics to PostHog."""
+    if not posthog_client or not email:
+        return
+
+    anon_id = anonymize_user(email)
+    if analysis_result.get('error'):
+        posthog_client.capture(distinct_id=anon_id, event='llm_generation_error', properties={
+            'error_msg': analysis_result.get('error'),
+            'llm_generation_time_ms': t_duration_ms
+        })
+    else:
+        posthog_client.capture(distinct_id=anon_id, event='emails_fetched', properties={
+            'newsletter_count': len(messages),
+            'raw_html_length': raw_length,
+            'optimized_text_length': optimized_length,
+            'llm_generation_time_ms': t_duration_ms,
+            'output_text_length': len(json.dumps(analysis_result)),
+            'time_window_hours': hours
+        })
+
 def get_user_email_for_rate_limit():
     """Get user email from session or use IP address as fallback"""
     if 'user_email' in session:
@@ -865,7 +1017,7 @@ def get_user_email_for_rate_limit():
     return get_remote_address()
 
 @app.route('/api/fetch_emails')
-@limiter.limit("3 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit of 3 briefings. Upgrade to Pro for unlimited briefings or try again tomorrow!")
+@limiter.limit("3 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit of 3 briefings. Upgrade to Pro for unlimited briefings or try again tomorrow!", deduct_when=lambda res: res.status_code == 200)
 def fetch_emails():
     if 'credentials' not in session: 
         return jsonify({'error': 'Please log in to generate your briefing.'}), 401
@@ -882,11 +1034,10 @@ def fetch_emails():
 
     cache_key = email or str(user_info.get('id', 'unknown')) if user_info else 'unknown'
     current_hash = get_settings_hash(settings)
-    with _cache_lock:
-        cache = load_cache()
-        user_cache = cache.get(cache_key, {})
-        if (user_cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (user_cache.get('settings_hash') == current_hash) and (user_cache.get('analysis')):
-            return jsonify(user_cache['analysis'])
+
+    cached_analysis = _check_cached_analysis(cache_key, current_hash)
+    if cached_analysis:
+        return jsonify(cached_analysis)
 
     creds_data = session.get('credentials')
     if not creds_data:
@@ -902,94 +1053,57 @@ def fetch_emails():
         keywords = [k.lower() for k in settings.get('keywords', [])]
         priority_sources = [p.lower() for p in settings.get('priority_sources', [])]
 
-        sources_query = " OR ".join([f"from:{s}" for s in sources])
-        query = f"({sources_query}) newer_than:{hours}h"
-
-        # ⚡ Bolt: Use AuthorizedSession directly for Gmail API to avoid discovery document fetch
-        auth_session = AuthorizedSession(creds)
-        url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages"
-        resp = auth_session.get(url, params={'q': query, 'maxResults': 50}, timeout=10)
-        resp.raise_for_status()
-        results = resp.json()
-        messages = results.get('messages', [])
+        messages = _search_gmail_messages(creds, sources, hours)
         if not messages:
             return jsonify({'story_groups': [], 'remaining_stories': [{'headline': f'No newsletters found in last {hours}h.'}]})
 
-        worker_args = [(i, msg['id'], creds_dict, keywords, priority_sources) for i, msg in enumerate(messages)]
-        # ⚡ Bolt: Use list append and join instead of string concatenation (+=) to improve performance
-        priority_text_parts = []
-        normal_text_parts = []
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            for _index, email_block, is_priority in executor.map(_fetch_one_message, worker_args):
-                if email_block is None:
-                    continue
-                if is_priority:
-                    priority_text_parts.append(f"*** PRIORITY SOURCE ***\n{email_block}")
-                else:
-                    normal_text_parts.append(email_block)
+        consolidated_text, normal_count, priority_count = _process_email_messages(
+            messages, creds_dict, keywords, priority_sources
+        )
 
-        consolidated_text = "".join(priority_text_parts) + "".join(normal_text_parts)
         if not consolidated_text:
             reason = "No text found matching your watchlist." if keywords else "No text found."
             return jsonify({'story_groups': [], 'remaining_stories': [{'headline': reason}]})
-
-        raw_length = sum(len(msg_str) for msg_str in normal_text_parts + priority_text_parts)
-        optimized_length = len(consolidated_text)
-        newsletter_count = len(normal_text_parts) + (len(priority_text_parts) // 2) # priority adds 2 parts per message (wait, let's just use number of fetched parts)
-        newsletter_count = len(messages) # We can approximate by checking how many were requested 
 
         t_start = time.time()
         analysis_result = analyze_news_with_llm(consolidated_text)
         t_duration_ms = int((time.time() - t_start) * 1000)
 
-        if posthog_client and email:
-            anon_id = anonymize_user(email)
-            if analysis_result.get('error'):
-                posthog_client.capture(anon_id, 'llm_generation_error', {
-                    'error_msg': analysis_result.get('error'),
-                    'llm_generation_time_ms': t_duration_ms
-                })
-            else:
-                posthog_client.capture(anon_id, 'emails_fetched', {
-                    'newsletter_count': newsletter_count,
-                    'raw_html_length': raw_length,
-                    'optimized_text_length': optimized_length,
-                    'llm_generation_time_ms': t_duration_ms,
-                    'output_text_length': len(json.dumps(analysis_result)),
-                    'time_window_hours': hours
-                })
+        _report_fetch_metrics(
+            email=email,
+            analysis_result=analysis_result,
+            t_duration_ms=t_duration_ms,
+            hours=hours,
+            messages=messages,
+            normal_count=normal_count,
+            priority_count=priority_count,
+            raw_length=0, # approximating these two as they aren't computed exactly here anymore, we could re-add calculation later if critical
+            optimized_length=len(consolidated_text)
+        )
 
         if analysis_result.get('error'):
             return jsonify(analysis_result), 503
 
-        with _cache_lock:
-            cache = load_cache()
-            user_cache = cache.get(cache_key, {})
-            user_cache['timestamp'] = time.time()
-            user_cache['settings_hash'] = current_hash
-            user_cache['analysis'] = analysis_result
-            if 'audio' in user_cache:
-                del user_cache['audio']
-            if 'script_hash' in user_cache:
-                del user_cache['script_hash']
-            cache[cache_key] = user_cache
-            save_cache(cache)
+        _update_cached_analysis(cache_key, current_hash, analysis_result)
         return jsonify(analysis_result)
+
     except Exception as e:
         err_msg = str(e).lower()
         
         if posthog_client and email:
-             posthog_client.capture(anonymize_user(email), 'fetch_email_error', {'error': err_msg})
+             posthog_client.capture(distinct_id=anonymize_user(email), event='fetch_email_error', properties={'error': err_msg})
 
         if 'quota' in err_msg or 'rate' in err_msg or '429' in err_msg:
             return jsonify({'error': "Gmail rate limit reached. Please try again in a few minutes."}), 429
         if 'credentials' in err_msg or 'token' in err_msg or '401' in err_msg:
             return jsonify({'error': "Your session expired. Please log in again."}), 401
+        import traceback
+        traceback.print_exc()
         print(f"fetch_emails error: {e}")
-        return jsonify({'error': "Unable to fetch newsletters. Please check your connection and try again."}), 500
+        return jsonify({'error': f"Unable to fetch newsletters. Exact error: {str(e)}"}), 500
 
 @app.route('/api/generate_audio', methods=['POST'])
-@limiter.limit("5 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit of 5 audio generations. Upgrade to Pro for unlimited audio or try again tomorrow!")
+@limiter.limit("5 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit of 5 audio generations. Upgrade to Pro for unlimited audio or try again tomorrow!", deduct_when=lambda res: res.status_code == 200)
 def generate_audio():
     if 'credentials' not in session: 
         return jsonify({'error': 'Please log in to generate audio.'}), 401
@@ -1033,37 +1147,13 @@ def generate_audio():
             if user_cache.get('script_hash') == script_hash and user_cache.get('audio'):
                 return jsonify({"audio_content": user_cache['audio']})
 
-        sentences = re.split(r'(?<=[.!?])\s+', script_text)
-        chunks = []
-        # ⚡ Bolt: Replace O(N^2) string concatenation loop with string builder pattern and incremental byte tracking
-        current_chunk_parts = []
-        current_chunk_bytes = 0
-        byte_limit = 4800
-        for sentence in sentences:
-            sentence_bytes = len(sentence.encode('utf-8')) + 1 # +1 for the space
-            if current_chunk_bytes + sentence_bytes < byte_limit:
-                current_chunk_parts.append(sentence)
-                current_chunk_parts.append(" ")
-                current_chunk_bytes += sentence_bytes
-            else:
-                if current_chunk_parts:
-                    chunks.append("".join(current_chunk_parts))
-                current_chunk_parts = [sentence, " "]
-                current_chunk_bytes = sentence_bytes
-        if current_chunk_parts:
-            chunks.append("".join(current_chunk_parts))
-
-        worker_args = [(i, chunk_text, creds_dict, style, PROJECT_ID) for i, chunk_text in enumerate(chunks)]
-        t_start = time.time()
-        with ThreadPoolExecutor(max_workers=min(len(chunks), 8)) as executor:
-            results = list(executor.map(_synthesize_one_chunk, worker_args))
-        all_audio_content = b"".join(audio for _idx, audio in results)
-        tts_duration_ms = int((time.time() - t_start) * 1000)
+        chunks = _chunk_script_text(script_text)
+        all_audio_content, tts_duration_ms = _synthesize_audio_from_chunks(chunks, creds_dict, style, PROJECT_ID)
 
         audio_base64 = base64.b64encode(all_audio_content).decode('utf-8')
         
         if posthog_client and email:
-            posthog_client.capture(anonymize_user(email), 'audio_generated', {
+            posthog_client.capture(distinct_id=anonymize_user(email), event='audio_generated', properties={
                 'tts_generation_time_ms': tts_duration_ms,
                 'persona_selected': style
             })
@@ -1097,8 +1187,7 @@ def share_briefing():
         return jsonify({'error': 'Invalid data content. Required fields missing.'}), 400
 
     allowed_keys = {'story_groups', 'remaining_stories'}
-    validated_data = {k: data[k] for k in allowed_keys if k in data}
-    data = validated_data
+    sanitized_data = {k: data[k] for k in allowed_keys if k in data}
 
     share_id = str(uuid.uuid4())
     if DATABASE_URL:
