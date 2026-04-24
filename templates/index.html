@@ -520,6 +520,43 @@
             );
         };
 
+        // ⚡ Bolt: Wrapped the StoryGroup component in React.memo() to prevent unnecessary re-renders.
+        // During audio playback, the parent Dashboard's 'audioProgress' state updates frequently
+        // (multiple times per second). Without memoization, these heavy DOM elements would be
+        // re-rendered and reconciled on every tick, severely degrading UI performance.
+        const StoryGroup = React.memo(({ group, index }) => {
+            return (
+                <section className="story-group mb-24" style={{ animation: 'fadeIn 0.6s ease-out both', animationDelay: `${index * 150}ms` }}>
+                    <h2 className="font-display text-[2.5rem] sm:text-[3.5rem] leading-[1.1] tracking-tight mb-6 text-slate-900 dark:text-white">{group.group_headline}</h2>
+                    <p className="font-body text-xl sm:text-2xl text-slate-600 dark:text-slate-300 max-w-[1000px] mb-12 leading-relaxed">{group.consensus_summary || group.group_summary}</p>
+
+                    {group.stories && group.stories.length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-slate-200 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 mb-8 shadow-sm perspective-split">
+                            {group.stories.map((story, i) => {
+                                const source = story.source.split('<')[0].trim().replace(/\.(com|co\.\w+)$/, '') || story.source;
+                                return (
+                                    <div key={i} className="bg-white dark:bg-slate-900 p-8 split-pane">
+                                        <span className="font-mono text-xs font-bold uppercase tracking-widest text-amber-500 mb-4 block split-label">
+                                            {source}
+                                        </span>
+                                        <p className="font-body text-lg text-slate-800 dark:text-slate-200 m-0 split-content leading-relaxed">
+                                            "{story.angle}"
+                                        </p>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )}
+
+                    {group.stories && group.stories.length > 0 && (
+                        <footer className="font-mono text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 border-t border-slate-200 dark:border-slate-800 pt-4 source-links">
+                            Verified Sources: {group.stories.map(s => s.source.split('<')[0].trim().replace(/\.(com|co\.\w+)$/, '')).join(', ')}
+                        </footer>
+                    )}
+                </section>
+            );
+        });
+
         const Dashboard = ({ userInfo, sharedData, isMockSession }) => {
             const [analysis, setAnalysis] = React.useState(sharedData || null);
             const [audioSrc, setAudioSrc] = React.useState(null);
@@ -1304,34 +1341,7 @@
                             <div className="space-y-24">
                                 <div>
                                     {analysis.story_groups && analysis.story_groups.map((group, index) => (
-                                        <section key={index} className="story-group mb-24" style={{ animation: 'fadeIn 0.6s ease-out both', animationDelay: `${index * 150}ms` }}>
-                                            <h2 className="font-display text-[2.5rem] sm:text-[3.5rem] leading-[1.1] tracking-tight mb-6 text-slate-900 dark:text-white">{group.group_headline}</h2>
-                                            <p className="font-body text-xl sm:text-2xl text-slate-600 dark:text-slate-300 max-w-[1000px] mb-12 leading-relaxed">{group.consensus_summary || group.group_summary}</p>
-                                            
-                                            {group.stories && group.stories.length > 0 && (
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-slate-200 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 mb-8 shadow-sm perspective-split">
-                                                    {group.stories.map((story, i) => {
-                                                        const source = story.source.split('<')[0].trim().replace(/\.(com|co\.\w+)$/, '') || story.source;
-                                                        return (
-                                                            <div key={i} className="bg-white dark:bg-slate-900 p-8 split-pane">
-                                                                <span className="font-mono text-xs font-bold uppercase tracking-widest text-amber-500 mb-4 block split-label">
-                                                                    {source}
-                                                                </span>
-                                                                <p className="font-body text-lg text-slate-800 dark:text-slate-200 m-0 split-content leading-relaxed">
-                                                                    "{story.angle}"
-                                                                </p>
-                                                            </div>
-                                                        )
-                                                    })}
-                                                </div>
-                                            )}
-                                            
-                                            {group.stories && group.stories.length > 0 && (
-                                                <footer className="font-mono text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 border-t border-slate-200 dark:border-slate-800 pt-4 source-links">
-                                                    Verified Sources: {group.stories.map(s => s.source.split('<')[0].trim().replace(/\.(com|co\.\w+)$/, '')).join(', ')}
-                                                </footer>
-                                            )}
-                                        </section>
+                                        <StoryGroup key={index} group={group} index={index} />
                                     ))}
                                 </div>
                                 
