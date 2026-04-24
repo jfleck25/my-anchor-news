@@ -1,8 +1,5 @@
-🎯 What:
-Fixed an Insufficient Data Validation vulnerability in the `/api/share` endpoint (`main.py`). The endpoint previously accepted any arbitrary JSON payload and stored it directly in the database as long as one of the expected keys (`story_groups` or `remaining_stories`) was present. The fix introduces strict schema enforcement by explicitly constructing a `sanitized_data` dictionary containing only the allowed keys before database insertion.
-
-⚠️ Risk:
-By failing to strictly filter incoming JSON data before storage, the application was vulnerable to Mass Assignment and abusive storage attacks. An attacker could inject enormous, arbitrary, or malicious JSON blobs into the database alongside valid data. This could lead to resource exhaustion (database bloat), denial of service, or potentially exploit downstream parsers/consumers that read the `shared_briefings` data.
-
-🛡️ Solution:
-Updated `share_briefing()` in `main.py` to extract only the specific keys required for the feature (`story_groups` and `remaining_stories`) into a new dictionary. Any other injected keys in the request payload are safely discarded before being serialized to JSON and inserted into PostgreSQL. Added comprehensive unit tests in `test_share_briefing.py` and `test_shared_briefing.py` to verify the isolation and safety of the endpoint.
+🚨 **Severity**: MEDIUM
+💡 **Vulnerability**: The `/api/settings` POST endpoint lacked strict data type validation when extracting allowed keys from incoming JSON payloads. This exposed the application to type mismatches.
+🎯 **Impact**: An attacker or errant client could inject unexpected types (like a string instead of a list of sources) causing a persistent Denial of Service state, as downstream functions (`fetch_emails`) would crash while trying to process the malformed configuration.
+🔧 **Fix**: Enhanced the key-plucking mechanism in `update_settings` to explicitly validate the types of `sources`, `time_window_hours`, `personality`, `priority_sources`, and `keywords` using `isinstance()`, rejecting mismatches with a 400 Bad Request error.
+✅ **Verification**: Run `python3 test_security.py` and `python3 -m pytest tests/` to confirm that valid JSON structures succeed while type mismatches are correctly rejected without overwriting the settings payload.

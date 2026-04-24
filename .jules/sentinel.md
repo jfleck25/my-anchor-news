@@ -53,3 +53,17 @@
 **Vulnerability:** The application accepted unconstrained incoming JSON payloads without imposing a `MAX_CONTENT_LENGTH` on the Flask configuration.
 **Learning:** Without setting a global upper bound on request content length, attackers can submit excessively large payloads to endpoints like `/api/share` or `/api/settings` causing resource exhaustion, memory out-of-bounds, and application unavailability (Denial of Service).
 **Prevention:** Always configure `app.config['MAX_CONTENT_LENGTH']` in Flask to limit incoming request sizes according to acceptable use cases (e.g., 2MB).
+## 2026-04-08 - OAuth State Replay Vulnerability
+**Vulnerability:** The `oauth2callback` endpoint retrieved the OAuth `state` parameter from the user's session using `state = session['state']` but failed to pop it from the session. This leaves the `state` parameter in the session, allowing it to potentially be reused.
+**Learning:** Failing to remove single-use tokens (like OAuth state) from session storage after their first use leaves them vulnerable to replay attacks if an attacker intercepts an authorization response.
+**Prevention:** Always use `session.pop('key')` instead of `session['key']` when retrieving single-use security tokens from session storage to ensure they are immediately invalidated.
+
+## 2025-04-06 - Rate Limiting on External API Calls
+**Vulnerability:** Endpoints that consume external APIs (like TTS generation) or database resources (like sharing briefings) lacked rate limits, leaving the application vulnerable to resource exhaustion and financial DoS attacks from authenticated users.
+**Learning:** Rate limiting is not just for primary data-fetching routes; it is crucial for *all* endpoints that perform intensive operations, call costly external APIs, or allocate storage, even if the user is authenticated.
+**Prevention:** Always apply rate limits (`@limiter.limit()`) to sensitive authenticated endpoints that consume significant resources or external quota.
+
+## 2026-04-23 - Persistent DoS via Missing Input Type Validation
+**Vulnerability:** The `/api/settings` POST endpoint plucked allowed keys from the incoming JSON payload but failed to validate their expected data types (e.g., ensuring `sources` is a list or `time_window_hours` is an integer/float). If an attacker provided a string where a list was expected, downstream processing logic (like `fetch_emails` iterating over `sources`) would crash, leading to a persistent Denial of Service state for the user until their settings were manually corrected.
+**Learning:** Checking for key presence (schema validation) is insufficient if the underlying data types are not strictly enforced. Type mismatch vulnerabilities can persist statefully and break core application functionality.
+**Prevention:** Always enforce strict type checking (e.g., `isinstance()`) on all user-supplied data fields in API endpoints before saving configuration state, ensuring it conforms to the application's expected structures.
