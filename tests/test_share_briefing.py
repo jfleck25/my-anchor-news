@@ -9,7 +9,7 @@ MOCKED_MODULES = [
     'google', 'google.oauth2', 'google.oauth2.credentials', 'googleapiclient',
     'googleapiclient.discovery', 'google.generativeai', 'google.cloud',
     'google.api_core', 'bs4', 'google.auth', 'google.auth.transport',
-    'google.auth.transport.requests', 'psycopg2', 'psycopg2.extras',
+    'google.auth.transport.requests', 'google.api_core.exceptions', 'psycopg2', 'psycopg2.extras',
     'psycopg2.pool',
     'sentry_sdk', 'sentry_sdk.integrations', 'sentry_sdk.integrations.flask'
 ]
