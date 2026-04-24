@@ -301,7 +301,15 @@ def get_user_info():
         session.pop('user_info', None)
         return None
 
+
+# ⚡ Bolt: Cache DB-based settings to prevent repetitive synchronous blockages in hot loops.
+# This cache reduces DB overhead for load_settings on cache hits significantly.
+# We invalidate on explicit save_settings.
+_db_settings_cache = {}
+_db_settings_lock = threading.Lock()
+
 def load_settings(user_email=None):
+
     defaults = {
         "sources": ["wsj.com", "nytimes.com", "axios.com", "theguardian.com", "techcrunch.com"],
         "time_window_hours": 24,
@@ -313,6 +321,15 @@ def load_settings(user_email=None):
     if user_email == "demo@myanchor.test":
         return defaults
     
+    # 1) If we have a user email, check the unified per-email cache first
+    if user_email:
+        with _db_settings_lock:
+            if user_email in _db_settings_cache:
+                return copy.deepcopy(_db_settings_cache[user_email])
+
+    user_settings = None
+
+    # 2) If using DB, try fetching from there
     if DATABASE_URL and user_email:
         try:
             conn = get_db_connection()
@@ -326,37 +343,54 @@ def load_settings(user_email=None):
             if row:
                 user_settings = defaults.copy()
                 user_settings.update(row['settings'] or {})
-                return user_settings
         except Exception:
             pass
 
-    # ⚡ Bolt: Cache file-based settings. We check the file's modification time (mtime).
-    # If the file hasn't changed since the last read, we return a deep copy of the cached
-    # settings dictionary instead of repeatedly reading and parsing the JSON from disk.
-    # This reduces load_settings() time from ~0.37ms to ~0.11ms (~70% reduction) on cache hit.
-    global _file_settings_cache, _file_settings_mtime
-    if not os.path.exists(SETTINGS_FILE):
-        return defaults
-    try:
-        mtime = os.path.getmtime(SETTINGS_FILE)
-        with _file_settings_lock:
-            if _file_settings_cache is not None and _file_settings_mtime == mtime:
-                return copy.deepcopy(_file_settings_cache)
+    # 3) If no DB or DB fetch failed/returned nothing, fallback to file or defaults
+    if user_settings is None:
+        global _file_settings_cache, _file_settings_mtime
+        if not os.path.exists(SETTINGS_FILE):
+            user_settings = defaults.copy()
+        else:
+            try:
+                mtime = os.path.getmtime(SETTINGS_FILE)
+                with _file_settings_lock:
+                    if _file_settings_cache is not None and _file_settings_mtime == mtime:
+                        user_settings = copy.deepcopy(_file_settings_cache)
 
-        with open(SETTINGS_FILE, 'r') as f:
-            data = json.load(f)
+                if user_settings is None:
+                    with open(SETTINGS_FILE, 'r') as f:
+                        data = json.load(f)
+                    with _file_settings_lock:
+                        _file_settings_cache = copy.deepcopy(data)
+                        _file_settings_mtime = mtime
+                    user_settings = copy.deepcopy(_file_settings_cache)
+            except Exception:
+                user_settings = defaults.copy()
 
-        with _file_settings_lock:
-            _file_settings_cache = copy.deepcopy(data)
-            _file_settings_mtime = mtime
-            return copy.deepcopy(_file_settings_cache)
-    except Exception:
-        return defaults
+    # 4) Cache the final result (negative or positive) for this user
+    if user_email:
+        with _db_settings_lock:
+            if len(_db_settings_cache) > 1000:
+                # Naive bounded LRU by dropping half the cache to prevent sudden spikes
+                keys_to_delete = list(_db_settings_cache.keys())[:500]
+                for k in keys_to_delete:
+                    del _db_settings_cache[k]
+            _db_settings_cache[user_email] = copy.deepcopy(user_settings)
+
+    return user_settings
 
 def save_settings(new_settings, user_email=None):
     # In demo mode, never persist settings
     if user_email == "demo@myanchor.test":
         return True
+
+    # ⚡ Bolt: Invalidate the in-memory settings cache when we update settings
+    if user_email:
+        with _db_settings_lock:
+            if user_email in _db_settings_cache:
+                del _db_settings_cache[user_email]
+
     if DATABASE_URL and user_email:
         try:
             conn = get_db_connection()
