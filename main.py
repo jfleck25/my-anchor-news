@@ -566,6 +566,49 @@ def get_settings_hash(settings):
     s = json.dumps(settings, sort_keys=True)
     return hashlib.md5(s.encode()).hexdigest()
 
+def _extract_message_body(payload):
+    """Extract the HTML body data from a Gmail message payload."""
+    if 'parts' in payload:
+        for part in payload['parts']:
+            if part['mimeType'] == 'text/html':
+                return part['body']['data']
+    return payload.get('body', {}).get('data', '')
+
+def _process_message(msg, keywords, priority_sources):
+    """Parse the message payload, extract content, and filter by keywords."""
+    headers = msg['payload']['headers']
+
+    # ⚡ Bolt: Extract subject and sender using generator expressions
+    subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
+    sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'No Sender')
+
+    body_data = _extract_message_body(msg['payload'])
+    if not body_data:
+        return None, None
+
+    decoded_data = base64.urlsafe_b64decode(body_data.encode('ASCII'))
+    html_str = decoded_data.decode('utf-8', errors='ignore')
+    optimized_text = optimize_newsletter_for_llm(html_str, max_chars=15000)
+    sanitized_text = sanitize_for_llm(optimized_text)
+
+    if keywords:
+        sanitized_text_lower = sanitized_text.lower()
+        subject_lower = subject.lower()
+        has_keyword = any(k in sanitized_text_lower or k in subject_lower for k in keywords)
+        if not has_keyword:
+            return None, None
+
+    email_block = f"\n\n--- Newsletter from: {sender} ---\n--- Subject: {subject} ---\n{sanitized_text}\n"
+
+    # ⚡ Bolt: optimize string operations for priority sources
+    if priority_sources:
+        sender_lower = sender.lower()
+        is_priority = any(p in sender_lower for p in priority_sources)
+    else:
+        is_priority = False
+
+    return email_block, is_priority
+
 def _fetch_one_message(args):
     """Fetch a single Gmail message. Used by parallel workers. Returns (index, email_block, is_priority) or (index, None, None) on skip/error."""
     index, message_id, creds_dict, keywords, priority_sources = args
@@ -578,47 +621,12 @@ def _fetch_one_message(args):
         url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages/{message_id}?format=full"
         resp = session.get(url, timeout=10)
         resp.raise_for_status()
-        msg = resp.json()
-        headers = msg['payload']['headers']
 
-        # ⚡ Bolt: Extract subject and sender using generator expressions
-        subject = next((h['value'] for h in headers if h['name'].lower() == 'subject'), 'No Subject')
-        sender = next((h['value'] for h in headers if h['name'].lower() == 'from'), 'No Sender')
-
-        body_data = ""
-        if 'parts' in msg['payload']:
-            for part in msg['payload']['parts']:
-                if part['mimeType'] == 'text/html':
-                    body_data = part['body']['data']
-                    break
-        else:
-            body_data = msg['payload'].get('body', {}).get('data', '')
-        if not body_data:
-            return (index, None, None)
-        decoded_data = base64.urlsafe_b64decode(body_data.encode('ASCII'))
-        html_str = decoded_data.decode('utf-8', errors='ignore')
-        optimized_text = optimize_newsletter_for_llm(html_str, max_chars=15000)
-        sanitized_text = sanitize_for_llm(optimized_text)
-        if keywords:
-            sanitized_text_lower = sanitized_text.lower()
-            subject_lower = subject.lower()
-            has_keyword = any(k in sanitized_text_lower or k in subject_lower for k in keywords)
-            if not has_keyword:
-                return (index, None, None)
-        email_block = f"\n\n--- Newsletter from: {sender} ---\n--- Subject: {subject} ---\n{sanitized_text}\n"
-
-        # ⚡ Bolt: optimize string operations for priority sources
-        if priority_sources:
-            sender_lower = sender.lower()
-            is_priority = any(p in sender_lower for p in priority_sources)
-        else:
-            is_priority = False
-
+        email_block, is_priority = _process_message(resp.json(), keywords, priority_sources)
         return (index, email_block, is_priority)
     except Exception as e:
         print(f"fetch_emails: failed to fetch message {message_id}: {e}")
         return (index, None, None)
-
 def _synthesize_one_chunk(args):
     """Synthesize a single TTS chunk. Used by parallel workers. Returns (index, audio_bytes)."""
     index, chunk_text, creds_dict, style, project_id = args

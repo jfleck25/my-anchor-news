@@ -69,6 +69,7 @@ def test_index_environment_variables_set(client, monkeypatch):
             'index.html',
             sentry_dsn_frontend=test_sentry_dsn,
             posthog_api_key=test_posthog_key,
+            mock_mode=ANY,
             react_production=ANY
         )
 
@@ -87,6 +88,7 @@ def test_index_environment_variables_missing(client, monkeypatch):
             'index.html',
             sentry_dsn_frontend='',
             posthog_api_key='',
+            mock_mode=ANY,
             react_production=ANY
         )
 
