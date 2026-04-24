@@ -406,6 +406,8 @@ if api_key and not MOCK_MODE:
     except Exception:
         model = None
 else:
+    if not api_key and not MOCK_MODE:
+        print("CRITICAL: GOOGLE_API_KEY is missing from environment variables!")
     model = None
 
 def sanitize_for_llm(text):
@@ -945,12 +947,12 @@ def fetch_emails():
         if posthog_client and email:
             anon_id = anonymize_user(email)
             if analysis_result.get('error'):
-                posthog_client.capture(anon_id, 'llm_generation_error', {
+                posthog_client.capture(distinct_id=anon_id, event='llm_generation_error', properties={
                     'error_msg': analysis_result.get('error'),
                     'llm_generation_time_ms': t_duration_ms
                 })
             else:
-                posthog_client.capture(anon_id, 'emails_fetched', {
+                posthog_client.capture(distinct_id=anon_id, event='emails_fetched', properties={
                     'newsletter_count': newsletter_count,
                     'raw_html_length': raw_length,
                     'optimized_text_length': optimized_length,
@@ -979,7 +981,7 @@ def fetch_emails():
         err_msg = str(e).lower()
         
         if posthog_client and email:
-             posthog_client.capture(anonymize_user(email), 'fetch_email_error', {'error': err_msg})
+             posthog_client.capture(distinct_id=anonymize_user(email), event='fetch_email_error', properties={'error': err_msg})
 
         if 'quota' in err_msg or 'rate' in err_msg or '429' in err_msg:
             return jsonify({'error': "Gmail rate limit reached. Please try again in a few minutes."}), 429
@@ -1065,7 +1067,7 @@ def generate_audio():
         audio_base64 = base64.b64encode(all_audio_content).decode('utf-8')
         
         if posthog_client and email:
-            posthog_client.capture(anonymize_user(email), 'audio_generated', {
+            posthog_client.capture(distinct_id=anonymize_user(email), event='audio_generated', properties={
                 'tts_generation_time_ms': tts_duration_ms,
                 'persona_selected': style
             })
