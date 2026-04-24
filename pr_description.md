@@ -1,5 +1,11 @@
-🚨 **Severity**: MEDIUM
-💡 **Vulnerability**: The `/api/settings` POST endpoint lacked strict data type validation when extracting allowed keys from incoming JSON payloads. This exposed the application to type mismatches.
-🎯 **Impact**: An attacker or errant client could inject unexpected types (like a string instead of a list of sources) causing a persistent Denial of Service state, as downstream functions (`fetch_emails`) would crash while trying to process the malformed configuration.
-🔧 **Fix**: Enhanced the key-plucking mechanism in `update_settings` to explicitly validate the types of `sources`, `time_window_hours`, `personality`, `priority_sources`, and `keywords` using `isinstance()`, rejecting mismatches with a 400 Bad Request error.
-✅ **Verification**: Run `python3 test_security.py` and `python3 -m pytest tests/` to confirm that valid JSON structures succeed while type mismatches are correctly rejected without overwriting the settings payload.
+🎯 **What:**
+Refactored the overly complex `_fetch_one_message` function by extracting four logical blocks into smaller helper functions (`_extract_email_body`, `_decode_and_sanitize_body`, `_matches_keywords`, and `_is_priority_sender`).
+
+💡 **Why:**
+The original function was nearly 60 lines long, making it difficult to read, test, and maintain. By isolating pure logic blocks into dedicated helper functions, we improve modularity and reduce cognitive load for developers working within the concurrent fetch cycle. It also slightly improves robustness by using `.get()` for dictionary lookups on the payload headers.
+
+✅ **Verification:**
+Verified using `py_compile main.py`, unit tested with mock configurations on the extracted helper blocks, and ran `test_security.py` successfully.
+
+✨ **Result:**
+`_fetch_one_message` is now much shorter, linear, and explicitly conveys its data flow.
