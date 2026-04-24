@@ -1,5 +1,0 @@
-🚨 Severity: MEDIUM
-💡 Vulnerability: The application previously did not set a Content-Security-Policy (CSP) header in `add_security_headers`, leaving the React frontend relying solely on default framework protections. Without a strict CSP, XSS or injection vulnerabilities could compromise the user session and data.
-🎯 Impact: This acts as a robust defense-in-depth layer. If any other vulnerability in the application allowed an attacker to inject scripts into the DOM, the browser would execute them. A CSP restricts which domains and sources can execute scripts, fetch data, or apply styles.
-🔧 Fix: Added `response.headers['Content-Security-Policy']` to the `add_security_headers` middleware in `main.py`. The policy explicitly whitelists only trusted domains required by the app (e.g., Tailwind CSS, React via unpkg, Sentry, and PostHog) while restricting standard origins to `self`.
-✅ Verification: Tested the application locally with `python3 test_security.py` to ensure core API passes. Validated UI functionality with Node puppeteer tests (`node tests/test_ui.js`) to confirm the CSP does not break React mounting or external resource fetching.
