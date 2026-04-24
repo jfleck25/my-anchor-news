@@ -13,3 +13,21 @@
 ## $(date +%Y-%m-%d) - Optimize TTS chunking string accumulation
 **Learning:** In text-to-speech script chunking, string concatenation `+=` within a loop combined with repeatedly encoding the entire accumulating string to check its byte length results in O(N^2) time complexity. For large briefing scripts, this becomes a CPU bottleneck.
 **Action:** Use the string builder pattern (`.append()` parts to a list, then `"".join()`) and maintain a running sum of bytes (by only encoding the newly added piece) rather than re-evaluating the whole chunk's length on each iteration.
+## 2024-05-14 - Replace googleapiclient.discovery.build() with AuthorizedSession for performance
+**Learning:** Using `googleapiclient.discovery.build()` for Gmail API calls synchronously downloads a large JSON discovery document. In a `ThreadPoolExecutor` where thread locals are used (e.g. `_worker_thread_locals`), this expensive network call is repeated for *every* thread, drastically slowing down parallel execution.
+**Action:** When making simple, statically known Google API calls, replace `discovery.build()` with `google.auth.transport.requests.AuthorizedSession` to make direct REST calls. It preserves token refreshment logic while eliminating discovery overhead. Ensure `AuthorizedSession` is imported (`from google.auth.transport.requests import AuthorizedSession`).
+
+## $(date +%Y-%m-%d) - Optimize JSON parsing overhead via file memory caching
+**Learning:** In scenarios where local settings or state are read from disk (`user_settings.json`) across many requests, repeatedly calling `json.load()` imposes both I/O latency and CPU overhead for parsing JSON.
+**Action:** Implement an in-memory cache protected by a thread lock and invalidated via `os.path.getmtime(filepath)`. Return a deep copy (`copy.deepcopy()`) of the cached dictionary to prevent state leakage and mutation from callers. This can drastically reduce overhead (e.g., from ~0.37ms to ~0.11ms on a cache hit).
+
+## $(date +%Y-%m-%d) - Optimize JSON cache reading via mtime and deepcopy
+**Learning:** For large local JSON cache files (e.g., containing base64 audio), constantly invoking `json.load()` results in high CPU and I/O overhead. While `json.loads(json.dumps())` might sometimes be considered faster for deep recursive objects, `copy.deepcopy()` is incredibly fast for flat dictionaries containing massive strings, as it only copies pointers to the immutable string buffers.
+**Action:** Use an in-memory variable to store the parsed dictionary and invalidate it by checking `os.path.getmtime(CACHE_FILE)`. Return `copy.deepcopy()` of the cache object to protect global state without incurring the heavy cost of JSON string parsing on every cache hit.
+## $(date +%Y-%m-%d) - Optimize JSON parsing overhead via file memory caching (String caching over deepcopy)
+**Learning:** In scenarios where local settings or state are read from disk (`cache.json`) across many requests, repeatedly calling `json.load()` imposes both I/O latency and CPU overhead for parsing JSON. While `copy.deepcopy()` on a parsed dictionary prevents state leakage, storing the raw JSON string in memory and parsing it on retrieval with `json.loads()` is significantly faster than `copy.deepcopy()` (e.g. ~47ms vs ~127ms) while safely generating a fresh dictionary each time.
+**Action:** When implementing in-memory caching for JSON files, cache the raw file contents (`f.read()`) instead of the parsed dictionary, and return `json.loads(cached_string)`. This naturally prevents state leakage and takes advantage of Python's fast C-based JSON parser.
+
+## 2026-04-24 - Add React.memo() to prevent unnecessary re-renders during high-frequency state updates
+**Learning:** In React components where a parent manages a high-frequency updating state (such as audio playback progress that updates multiple times per second), rendering heavy child DOM elements directly inside the parent causes unnecessary continuous reconciliation and layout thrashing, severely degrading UI performance.
+**Action:** Extract large or complex static/semi-static child element structures (like mapped arrays of data cards) into separate components wrapped in `React.memo()`. This ensures the heavy child components only re-render when their specific props change, rather than on every tick of the parent's independent high-frequency state update.

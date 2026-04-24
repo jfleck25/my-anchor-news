@@ -62,3 +62,7 @@
 **Vulnerability:** The application was setting several security headers (like HSTS and X-Frame-Options) but failed to set a Content-Security-Policy (CSP) header, leaving it vulnerable to Cross-Site Scripting (XSS) and other injection attacks.
 **Learning:** Even if a modern frontend framework (like React) is used, relying solely on it to prevent XSS is insufficient. A CSP acts as a crucial defense-in-depth layer, restricting the sources from which scripts, styles, and other resources can be loaded or executed, significantly mitigating the impact of any potential injection flaws.
 **Prevention:** Always implement a restrictive Content-Security-Policy header, explicitly defining allowlists for trusted sources and avoiding permissive directives like `unsafe-inline` or `unsafe-eval` unless strictly necessary and carefully reviewed.
+## 2026-04-24 - Fix Insecure Transport Allowed for OAuth
+**Vulnerability:** Setting `OAUTHLIB_INSECURE_TRANSPORT="1"` globally based solely on `FLASK_ENV != 'production'` risks unintentionally enabling insecure OAuth transport in intermediate environments (like staging or CI/CD test suites).
+**Learning:** Security-degrading developer conveniences must be strictly opt-in using explicitly named feature flags, rather than relying on broad environment negations.
+**Prevention:** Require specific override environment variables (e.g., `ALLOW_INSECURE_OAUTH=1`) for local development conveniences that weaken security, and explicitly unset dangerous flags if the override is not provided.
