@@ -661,6 +661,39 @@ def _fetch_one_message(args):
         print(f"fetch_emails: failed to fetch message {message_id}: {e}")
         return (index, None, None)
 
+
+def _chunk_script_text(script_text, byte_limit=4800):
+    """Splits script text into chunks that stay under the byte limit."""
+    sentences = re.split(r'(?<=[.!?])\s+', script_text)
+    chunks = []
+    # ⚡ Bolt: Replace O(N^2) string concatenation loop with string builder pattern and incremental byte tracking
+    current_chunk_parts = []
+    current_chunk_bytes = 0
+    for sentence in sentences:
+        sentence_bytes = len(sentence.encode('utf-8')) + 1 # +1 for the space
+        if current_chunk_bytes + sentence_bytes < byte_limit:
+            current_chunk_parts.append(sentence)
+            current_chunk_parts.append(" ")
+            current_chunk_bytes += sentence_bytes
+        else:
+            if current_chunk_parts:
+                chunks.append("".join(current_chunk_parts))
+            current_chunk_parts = [sentence, " "]
+            current_chunk_bytes = sentence_bytes
+    if current_chunk_parts:
+        chunks.append("".join(current_chunk_parts))
+    return chunks
+
+def _synthesize_audio_from_chunks(chunks, creds_dict, style, project_id):
+    """Synthesizes audio from chunks in parallel and concatenates the results."""
+    worker_args = [(i, chunk_text, creds_dict, style, project_id) for i, chunk_text in enumerate(chunks)]
+    t_start = time.time()
+    with ThreadPoolExecutor(max_workers=min(len(chunks), 8)) as executor:
+        results = list(executor.map(_synthesize_one_chunk, worker_args))
+    all_audio_content = b"".join(audio for _idx, audio in results)
+    tts_duration_ms = int((time.time() - t_start) * 1000)
+    return all_audio_content, tts_duration_ms
+
 def _synthesize_one_chunk(args):
     """Synthesize a single TTS chunk. Used by parallel workers. Returns (index, audio_bytes)."""
     index, chunk_text, creds_dict, style, project_id = args
@@ -1113,32 +1146,8 @@ def generate_audio():
             if user_cache.get('script_hash') == script_hash and user_cache.get('audio'):
                 return jsonify({"audio_content": user_cache['audio']})
 
-        sentences = re.split(r'(?<=[.!?])\s+', script_text)
-        chunks = []
-        # ⚡ Bolt: Replace O(N^2) string concatenation loop with string builder pattern and incremental byte tracking
-        current_chunk_parts = []
-        current_chunk_bytes = 0
-        byte_limit = 4800
-        for sentence in sentences:
-            sentence_bytes = len(sentence.encode('utf-8')) + 1 # +1 for the space
-            if current_chunk_bytes + sentence_bytes < byte_limit:
-                current_chunk_parts.append(sentence)
-                current_chunk_parts.append(" ")
-                current_chunk_bytes += sentence_bytes
-            else:
-                if current_chunk_parts:
-                    chunks.append("".join(current_chunk_parts))
-                current_chunk_parts = [sentence, " "]
-                current_chunk_bytes = sentence_bytes
-        if current_chunk_parts:
-            chunks.append("".join(current_chunk_parts))
-
-        worker_args = [(i, chunk_text, creds_dict, style, PROJECT_ID) for i, chunk_text in enumerate(chunks)]
-        t_start = time.time()
-        with ThreadPoolExecutor(max_workers=min(len(chunks), 8)) as executor:
-            results = list(executor.map(_synthesize_one_chunk, worker_args))
-        all_audio_content = b"".join(audio for _idx, audio in results)
-        tts_duration_ms = int((time.time() - t_start) * 1000)
+        chunks = _chunk_script_text(script_text)
+        all_audio_content, tts_duration_ms = _synthesize_audio_from_chunks(chunks, creds_dict, style, PROJECT_ID)
 
         audio_base64 = base64.b64encode(all_audio_content).decode('utf-8')
         
