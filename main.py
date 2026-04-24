@@ -865,7 +865,7 @@ def get_user_email_for_rate_limit():
     return get_remote_address()
 
 @app.route('/api/fetch_emails')
-@limiter.limit("3 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit of 3 briefings. Upgrade to Pro for unlimited briefings or try again tomorrow!")
+@limiter.limit("3 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit of 3 briefings. Upgrade to Pro for unlimited briefings or try again tomorrow!", deduct_when=lambda res: res.status_code == 200)
 def fetch_emails():
     if 'credentials' not in session: 
         return jsonify({'error': 'Please log in to generate your briefing.'}), 401
@@ -989,7 +989,7 @@ def fetch_emails():
         return jsonify({'error': "Unable to fetch newsletters. Please check your connection and try again."}), 500
 
 @app.route('/api/generate_audio', methods=['POST'])
-@limiter.limit("5 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit of 5 audio generations. Upgrade to Pro for unlimited audio or try again tomorrow!")
+@limiter.limit("5 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit of 5 audio generations. Upgrade to Pro for unlimited audio or try again tomorrow!", deduct_when=lambda res: res.status_code == 200)
 def generate_audio():
     if 'credentials' not in session: 
         return jsonify({'error': 'Please log in to generate audio.'}), 401
