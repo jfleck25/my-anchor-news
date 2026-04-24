@@ -22,6 +22,13 @@ import json
 import base64
 import random
 
+# Fix UnicodeEncodeError for emojis on Windows console
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 # Allow running from project root without installing the package
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
