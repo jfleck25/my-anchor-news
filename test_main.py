@@ -1,6 +1,6 @@
 import pytest
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch, ANY
 
 # Mock out heavy external dependencies before importing main
 
@@ -49,6 +49,47 @@ def test_index_route(client):
     # Depending on exact implementation it might be a redirect (302) or 200.
     # At minimum, asserting we get a response object without blowing up.
     assert response.status_code in [200, 302, 401]
+
+
+def test_index_environment_variables_set(client, monkeypatch):
+    """Test that the index route correctly parses environment variables when set."""
+    test_sentry_dsn = 'https://test@sentry.io/123'
+    test_posthog_key = 'phc_testkey123'
+
+    monkeypatch.setenv('SENTRY_DSN_FRONTEND', test_sentry_dsn)
+    monkeypatch.setenv('POSTHOG_API_KEY', test_posthog_key)
+
+    with patch('main.render_template') as mock_render:
+        mock_render.return_value = "Mocked Response"
+
+        response = client.get('/')
+
+        assert response.status_code == 200
+        mock_render.assert_called_once_with(
+            'index.html',
+            sentry_dsn_frontend=test_sentry_dsn,
+            posthog_api_key=test_posthog_key,
+            react_production=ANY, mock_mode=ANY
+        )
+
+def test_index_environment_variables_missing(client, monkeypatch):
+    """Test that the index route correctly defaults to empty strings when env vars are missing."""
+    monkeypatch.delenv('SENTRY_DSN_FRONTEND', raising=False)
+    monkeypatch.delenv('POSTHOG_API_KEY', raising=False)
+
+    with patch('main.render_template') as mock_render:
+        mock_render.return_value = "Mocked Response"
+
+        response = client.get('/')
+
+        assert response.status_code == 200
+        mock_render.assert_called_once_with(
+            'index.html',
+            sentry_dsn_frontend='',
+            posthog_api_key='',
+            react_production=ANY, mock_mode=ANY
+        )
+
 import unittest
 from unittest.mock import MagicMock
 import sys
@@ -65,6 +106,34 @@ class TestOptimization(unittest.TestCase):
     def test_worker_thread_locals(self):
         self.assertTrue(hasattr(main, '_worker_thread_locals'))
         self.assertIsInstance(main._worker_thread_locals, type(threading.local()))
+
+
+class TestGenerateAudio(unittest.TestCase):
+    def setUp(self):
+        import main
+        main.app.config['TESTING'] = True
+        self.client = main.app.test_client()
+
+    @patch('main.get_user_info')
+    def test_generate_audio_no_credentials(self, mock_get_user_info):
+        response = self.client.post('/api/generate_audio', json={"key": "val"})
+        self.assertEqual(response.status_code, 401)
+        self.assertIn('Please log in to generate audio.', response.get_data(as_text=True))
+
+    @patch('main.get_user_info')
+    def test_generate_audio_session_expired(self, mock_get_user_info):
+        with self.client.session_transaction() as sess:
+            sess['credentials'] = {'token': 'valid'}
+
+        def side_effect():
+            from flask import session
+            session.pop('credentials', None)
+            return None
+        mock_get_user_info.side_effect = side_effect
+
+        response = self.client.post('/api/generate_audio', json={"key": "val"})
+        self.assertEqual(response.status_code, 401)
+        self.assertIn('Your session expired. Please log in again.', response.get_data(as_text=True))
 
 if __name__ == '__main__':
     unittest.main()
