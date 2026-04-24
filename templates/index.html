@@ -1260,18 +1260,18 @@
                                 </div>
                                 <div className="flex flex-wrap gap-4 justify-center sm:justify-end items-center">
                                     {analysis && (
-                                        <button onClick={handleCopySummary} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Copy Executive Summary">
+                                        <button onClick={handleCopySummary} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Copy Executive Summary" aria-label="Copy Executive Summary">
                                             {copySuccess ? <Icons.Check /> : <Icons.Copy />}
                                             {copySuccess && <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-mono text-xs py-1 px-2 rounded opacity-100 uppercase tracking-wider">Copied</span>}
                                         </button>
                                     )}
                                     {analysis && (
-                                        <button onClick={handleDownloadPDF} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Download as PDF">
+                                        <button onClick={handleDownloadPDF} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Download as PDF" aria-label="Download as PDF">
                                             <Icons.Download />
                                         </button>
                                     )}
                                     {analysis && (
-                                        <button onClick={handleShare} disabled={isSharing} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title={isSharing ? "Sharing..." : "Share Briefing Link"}>
+                                        <button onClick={handleShare} disabled={isSharing} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title={isSharing ? "Sharing..." : "Share Briefing Link"} aria-label={isSharing ? "Sharing..." : "Share Briefing Link"}>
                                             {isSharing ? <span className="inline-block animate-spin"><Icons.Refresh /></span> : shareUrl ? <Icons.Check /> : <Icons.Share />}
                                         </button>
                                     )}
@@ -1370,7 +1370,7 @@
                         <div id="audio-player-bar" role="region" aria-label="Audio Player" className="fixed bottom-0 left-0 right-0 bg-slate-900 dark:bg-slate-950 p-4 sm:p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] z-50 animate-[slideUp_0.3s_ease-out]">
                             <div className="max-w-[1200px] mx-auto flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
                                 <div className="flex items-center gap-4">
-                                    <button onClick={togglePlayPause} className="w-14 h-14 bg-amber-500 text-white rounded-full flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-500 shadow-md" title={isPlaying ? "Pause" : "Play"}>
+                                    <button onClick={togglePlayPause} className="w-14 h-14 bg-amber-500 text-white rounded-full flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-500 shadow-md" title={isPlaying ? "Pause" : "Play"} aria-label={isPlaying ? "Pause" : "Play"}>
                                         {isPlaying ? <Icons.Pause /> : <Icons.Play />}
                                     </button>
                                     {webSpeechActive && (
@@ -1383,7 +1383,7 @@
                                     {audioSrc ? (
                                         <div className="flex items-center gap-4 w-full">
                                             <span className="font-mono text-xs text-slate-400 w-10 text-right shrink-0">{formatTime(audioProgress)}</span>
-                                            <div className="flex-1 h-3 bg-slate-700 rounded-full cursor-pointer relative overflow-hidden group" onClick={handleSeek} role="slider" aria-valuemin="0" aria-valuemax={audioDuration} aria-valuenow={audioProgress} tabIndex="0">
+                                            <div className="flex-1 h-3 bg-slate-700 rounded-full cursor-pointer relative overflow-hidden group" onClick={handleSeek} role="slider" aria-label="Audio progress" aria-valuemin="0" aria-valuemax={audioDuration} aria-valuenow={audioProgress} tabIndex="0">
                                                 <div className="absolute top-0 left-0 bottom-0 bg-amber-500 group-hover:bg-amber-400 transition-colors" style={{ width: `${audioDuration > 0 ? (audioProgress / audioDuration) * 100 : 0}%` }}></div>
                                             </div>
                                             <span className="font-mono text-xs text-slate-400 w-10 shrink-0">{formatTime(audioDuration)}</span>
@@ -1398,11 +1398,11 @@
                                     </div>
                                 </div>
                                 <div className="flex items-center justify-end gap-2 shrink-0">
-                                    <button onClick={handleToggleSpeed} className="h-10 px-3 font-mono text-xs font-bold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Playback speed">
+                                    <button onClick={handleToggleSpeed} className="h-10 px-3 font-mono text-xs font-bold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Playback speed" aria-label={`Playback speed: ${playbackRate}x`}>
                                         {playbackRate}x
                                     </button>
                                     {audioSrc && (
-                                        <a href={audioSrc} download={`MyAnchor_Briefing_${new Date().toISOString().split('T')[0]}.mp3`} className="h-10 w-10 flex items-center justify-center text-slate-300 hover:text-white rounded-full hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Download Audio">
+                                        <a href={audioSrc} download={`MyAnchor_Briefing_${new Date().toISOString().split('T')[0]}.mp3`} className="h-10 w-10 flex items-center justify-center text-slate-300 hover:text-white rounded-full hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Download Audio" aria-label="Download Audio">
                                             <Icons.Download />
                                         </a>
                                     )}
