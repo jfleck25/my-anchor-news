@@ -463,6 +463,57 @@ def generate_script_from_analysis(analysis_json, style="anchor"):
     script_parts.append(f" {persona['outro']}")
     return "".join(script_parts)
 
+ANALYSIS_PROMPT_TEMPLATE = """
+You are an elite media analyst processing raw text from multiple newsletters.
+Task:
+1. Group related stories from DIFFERENT newsletters into a single distinct news event.
+2. Create a neutral headline for the group (`group_headline`).
+3. Write a `consensus_summary`: A 3-4 sentence summary of the core facts that all sources agree on.
+4. **DEEP ANGLE ANALYSIS (Perspective Split)**: For EACH individual source/story in the group, extract its specific perspective, unique facts, or how it differs from others into the `angle` field. (1-2 sentences. Start with a verb like "Argues...", "Cites...", "Reveals...").
+5. **Remaining Stories**: Top 5 only. One-sentence summary.
+6. **Filter**: Ignore ads/fluff.
+7. **Limit**: Top 10 groups max.
+
+Output JSON format exactly:
+{
+  "story_groups": [
+    {
+      "group_headline": "...",
+      "consensus_summary": "...",
+      "stories": [
+        { "headline": "...", "source": "...", "angle": "..." }
+      ]
+    }
+  ],
+  "remaining_stories": [
+    { "headline": "..." }
+  ]
+}
+
+Content: ---
+{newsletters_text}"""
+
+
+def _parse_llm_response(response):
+    if response.candidates:
+        finish_reason = response.candidates[0].finish_reason
+        if finish_reason == 2: # MAX_TOKENS
+            return {"error": "The briefing was too long to generate. Try reducing your sources or lookback period."}
+        elif finish_reason == 3: # SAFETY
+            return {"error": "The analysis was blocked due to safety filters."}
+        elif finish_reason not in [1, 0] and hasattr(finish_reason, 'value') and finish_reason.value not in [1, 0]:
+            return {"error": "The AI encountered an unexpected interruption. Please try again."}
+
+    text = getattr(response, 'text', None)
+    if not text:
+        return {"error": "AI analysis failed."}
+
+    match = re.search(r'\{.*\}', text, re.DOTALL)
+    if match:
+        return json.loads(match.group(0))
+    else:
+        raise ValueError("No valid JSON found.")
+
 def analyze_news_with_llm(newsletters_text):
     if not model: raise Exception("Gemini API model is not configured.")
     
@@ -470,55 +521,11 @@ def analyze_news_with_llm(newsletters_text):
     if len(newsletters_text) > 800000:
         return {"error": "Too much newsletter content to process at once. Please reduce your lookback window in settings."}
 
-    prompt = """
-    You are an elite media analyst processing raw text from multiple newsletters.
-    Task:
-    1. Group related stories from DIFFERENT newsletters into a single distinct news event.
-    2. Create a neutral headline for the group (`group_headline`).
-    3. Write a `consensus_summary`: A 3-4 sentence summary of the core facts that all sources agree on.
-    4. **DEEP ANGLE ANALYSIS (Perspective Split)**: For EACH individual source/story in the group, extract its specific perspective, unique facts, or how it differs from others into the `angle` field. (1-2 sentences. Start with a verb like "Argues...", "Cites...", "Reveals...").
-    5. **Remaining Stories**: Top 5 only. One-sentence summary.
-    6. **Filter**: Ignore ads/fluff.
-    7. **Limit**: Top 10 groups max.
-    
-    Output JSON format exactly:
-    {
-      "story_groups": [
-        {
-          "group_headline": "...",
-          "consensus_summary": "...",
-          "stories": [
-            { "headline": "...", "source": "...", "angle": "..." }
-          ]
-        }
-      ],
-      "remaining_stories": [
-        { "headline": "..." }
-      ]
-    }
-    
-    Content: ---
-    """ + newsletters_text
+    prompt = ANALYSIS_PROMPT_TEMPLATE.format(newsletters_text=newsletters_text)
     try:
         generation_config = genai.types.GenerationConfig(max_output_tokens=8192, temperature=0.2)
         response = model.generate_content(prompt, generation_config=generation_config)
-        
-        # Check finish reason
-        if response.candidates:
-            finish_reason = response.candidates[0].finish_reason
-            if finish_reason == 2: # MAX_TOKENS
-                return {"error": "The briefing was too long to generate. Try reducing your sources or lookback period."}
-            elif finish_reason == 3: # SAFETY
-                return {"error": "The analysis was blocked due to safety filters."}
-            elif finish_reason not in [1, 0] and hasattr(finish_reason, 'value') and finish_reason.value not in [1, 0]:
-                return {"error": "The AI encountered an unexpected interruption. Please try again."}
-
-        text = getattr(response, 'text', None)
-        if not text:
-            return {"error": "AI analysis failed."}
-        match = re.search(r'\{.*\}', text, re.DOTALL)
-        if match: return json.loads(match.group(0))
-        else: raise ValueError("No valid JSON found.")
+        return _parse_llm_response(response)
     except json.JSONDecodeError:
         return {"error": "The AI failed to format the analysis correctly. Please try again."}
     except ResourceExhausted:
