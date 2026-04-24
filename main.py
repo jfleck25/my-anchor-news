@@ -486,7 +486,7 @@ def save_cache(data):
 
 def get_settings_hash(settings):
     s = json.dumps(settings, sort_keys=True)
-    return hashlib.md5(s.encode()).hexdigest()
+    return hashlib.sha256(s.encode()).hexdigest()
 
 def _fetch_one_message(args):
     """Fetch a single Gmail message. Used by parallel workers. Returns (index, email_block, is_priority) or (index, None, None) on skip/error."""
@@ -855,7 +855,7 @@ def generate_audio():
         if not analysis_data:
             return jsonify({'error': 'No briefing data to convert to audio.'}), 400
         script_text = generate_script_from_analysis(analysis_data, style)
-        script_hash = hashlib.md5((script_text + style).encode()).hexdigest()
+        script_hash = hashlib.sha256((script_text + style).encode()).hexdigest()
         with _cache_lock:
             cache = load_cache()
             user_cache = cache.get(cache_key, {})
@@ -928,7 +928,7 @@ def share_briefing():
             conn = get_db_connection()
             try:
                 cur = conn.cursor()
-                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(sanitized_data)))
+                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(data)))
                 conn.commit(); cur.close()
             finally:
                 release_db_connection(conn)

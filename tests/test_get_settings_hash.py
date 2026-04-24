@@ -54,11 +54,11 @@ class TestGetSettingsHash(unittest.TestCase):
 
         # Expected manual hash
         expected_json = json.dumps(settings, sort_keys=True)
-        expected_hash = hashlib.md5(expected_json.encode()).hexdigest()
+        expected_hash = hashlib.sha256(expected_json.encode()).hexdigest()
 
         result_hash = self.main_module.get_settings_hash(settings)
 
-        self.assertEqual(result_hash, expected_hash, "Hash output should match the MD5 of the sorted JSON string.")
+        self.assertEqual(result_hash, expected_hash, "Hash output should match the SHA256 of the sorted JSON string.")
 
     def test_get_settings_hash_type(self):
         settings = {"a": 1}

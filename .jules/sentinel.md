@@ -48,3 +48,8 @@
 **Vulnerability:** The application used an ephemeral, file-based cache (`cache.json`) to store generated email briefings (`cache['analysis']`) and synthesized audio (`cache['audio']`). However, the cache was global and only keyed by the user's `settings_hash` and the audio's `script_hash`. If two distinct users shared the same settings configuration (e.g., the default settings), a subsequent user could hit the cache and receive the private, sensitive email analysis or generated audio of the previous user.
 **Learning:** Storing private data in a global cache that is only keyed by configuration parameters (like settings hashes) instead of explicit user identifiers creates a severe Cross-Tenant Data Leak (Information Disclosure) vulnerability.
 **Prevention:** Always partition or scope cached data using a strong, unique user identifier (e.g., `user_id` or `email`) to ensure that one tenant's sensitive information is completely isolated and inaccessible to another, even if they share identical application states or configurations.
+
+## 2026-04-13 - Replace Weak MD5 Hashes with SHA-256
+**Vulnerability:** The application used MD5, a weak hashing algorithm, to generate hashes for configuration settings and audio scripts. While used for cache key generation rather than password storage, MD5 is prone to collision attacks.
+**Learning:** Even for non-cryptographic purposes like cache invalidation, using outdated hash functions like MD5 triggers security scanners and introduces unnecessary collision risks.
+**Prevention:** Always use modern, strong hashing algorithms like SHA-256 (via `hashlib.sha256`) for generating hashes across the codebase to ensure integrity and avoid static analysis warnings.
