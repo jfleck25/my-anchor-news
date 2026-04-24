@@ -120,12 +120,18 @@ def main():
     print(f"\n   Preview:\n   {script[:200]}...\n")
 
     print("🎙️  Calling Google Cloud Text-to-Speech API...")
-    # Use Application Default Credentials (gcloud auth application-default login)
-    # or set GOOGLE_APPLICATION_CREDENTIALS to a service account key path.
-    client_opts = None
-    if project_id:
-        from google.api_core import client_options as co
+    
+    api_key = os.environ.get("GOOGLE_API_KEY")
+    from google.api_core import client_options as co
+    
+    if api_key:
+        # Use API Key authentication
+        client_opts = co.ClientOptions(api_key=api_key)
+    elif project_id:
+        # Fallback to Application Default Credentials with quota project
         client_opts = co.ClientOptions(quota_project_id=project_id)
+    else:
+        client_opts = None
 
     tts_client = texttospeech.TextToSpeechClient(client_options=client_opts, transport="rest")
 

@@ -985,8 +985,10 @@ def fetch_emails():
             return jsonify({'error': "Gmail rate limit reached. Please try again in a few minutes."}), 429
         if 'credentials' in err_msg or 'token' in err_msg or '401' in err_msg:
             return jsonify({'error': "Your session expired. Please log in again."}), 401
+        import traceback
+        traceback.print_exc()
         print(f"fetch_emails error: {e}")
-        return jsonify({'error': "Unable to fetch newsletters. Please check your connection and try again."}), 500
+        return jsonify({'error': f"Unable to fetch newsletters. Exact error: {str(e)}"}), 500
 
 @app.route('/api/generate_audio', methods=['POST'])
 @limiter.limit("5 per day", key_func=get_user_email_for_rate_limit, error_message="You've reached your daily limit of 5 audio generations. Upgrade to Pro for unlimited audio or try again tomorrow!", deduct_when=lambda res: res.status_code == 200)
