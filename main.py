@@ -928,7 +928,7 @@ def share_briefing():
             conn = get_db_connection()
             try:
                 cur = conn.cursor()
-                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(sanitized_data)))
+                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(validated_data)))
                 conn.commit(); cur.close()
             finally:
                 release_db_connection(conn)

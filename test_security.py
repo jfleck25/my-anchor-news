@@ -63,6 +63,7 @@ sys.modules.update({
     'sentry_sdk': MagicMock(),
     'sentry_sdk.integrations.flask': MagicMock(),
     'bs4': MagicMock(),
+    'posthog': MagicMock(),
 })
 
 import main
