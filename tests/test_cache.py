@@ -5,27 +5,53 @@ import main
 
 class TestCache(unittest.TestCase):
 
+    def setUp(self):
+        # Reset cache globals before each test
+        main._file_cache_string = None
+        main._file_cache_mtime = 0
+
     @patch('os.path.exists')
     def test_load_cache_no_file(self, mock_exists):
         mock_exists.return_value = False
         result = main.load_cache()
         self.assertEqual(result, {})
 
+    @patch('os.path.getmtime')
     @patch('os.path.exists')
     @patch('builtins.open', new_callable=mock_open, read_data='{"key": "value"}')
-    def test_load_cache_valid_json(self, mock_file, mock_exists):
+    def test_load_cache_valid_json(self, mock_file, mock_exists, mock_getmtime):
         mock_exists.return_value = True
+        mock_getmtime.return_value = 12345.6
         result = main.load_cache()
         self.assertEqual(result, {"key": "value"})
         mock_file.assert_called_once_with(main.CACHE_FILE, 'r')
 
+    @patch('os.path.getmtime')
     @patch('os.path.exists')
     @patch('builtins.open', new_callable=mock_open, read_data='invalid json')
-    def test_load_cache_invalid_json(self, mock_file, mock_exists):
+    def test_load_cache_invalid_json(self, mock_file, mock_exists, mock_getmtime):
         mock_exists.return_value = True
+        mock_getmtime.return_value = 12345.6
         result = main.load_cache()
         self.assertEqual(result, {})
         mock_file.assert_called_once_with(main.CACHE_FILE, 'r')
+
+    @patch('os.path.getmtime')
+    @patch('os.path.exists')
+    @patch('builtins.open', new_callable=mock_open, read_data='{"key": "value"}')
+    def test_load_cache_memory_hit(self, mock_file, mock_exists, mock_getmtime):
+        mock_exists.return_value = True
+        mock_getmtime.return_value = 12345.6
+        # First call loads from file
+        result1 = main.load_cache()
+        self.assertEqual(result1, {"key": "value"})
+        mock_file.assert_called_once()
+
+        # Second call hits memory cache
+        result2 = main.load_cache()
+        self.assertEqual(result2, {"key": "value"})
+        # Ensure open wasn't called again
+        self.assertEqual(mock_file.call_count, 1)
 
     @patch('builtins.open', new_callable=mock_open)
     def test_save_cache_success(self, mock_file):

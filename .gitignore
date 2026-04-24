@@ -44,3 +44,4 @@ my-anchor-voice-model-research.md
 
 # Node
 node_modules/
+.gstack/
