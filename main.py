@@ -510,7 +510,7 @@ ANALYSIS_PROMPT_TEMPLATE = """
     4. **DEEP ANGLE ANALYSIS (Perspective Split)**: For EACH individual source/story in the group, extract its specific perspective, unique facts, or how it differs from others into the `angle` field. (1-2 sentences. Start with a verb like "Argues...", "Cites...", "Reveals...").
     5. **Remaining Stories**: Top 5 only. One-sentence summary.
     6. **Filter**: Ignore ads/fluff.
-    7. **Limit**: Top 10 groups max.
+    7. **Limit**: Top 10 groups max. For each group, include the top 5 most relevant sources max.
     
     Output JSON format exactly:
     {
@@ -553,12 +553,12 @@ def analyze_news_with_llm(newsletters_text):
     if not model: raise Exception("Gemini API model is not configured.")
 
     # Pre-validation check
-    if len(newsletters_text) > 800000:
+    if len(newsletters_text) > 1500000:
         return {"error": "Too much newsletter content to process at once. Please reduce your lookback window in settings."}
 
     prompt = ANALYSIS_PROMPT_TEMPLATE + newsletters_text
     try:
-        generation_config = genai.types.GenerationConfig(max_output_tokens=8192, temperature=0.2)
+        generation_config = genai.types.GenerationConfig(max_output_tokens=16384, temperature=0.2)
         response = model.generate_content(prompt, generation_config=generation_config)
         return _process_llm_response(response)
     except json.JSONDecodeError:
@@ -959,7 +959,7 @@ def _search_gmail_messages(creds, sources, hours):
     query = f"({sources_query}) newer_than:{hours}h"
     auth_session = AuthorizedSession(creds)
     url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages"
-    resp = auth_session.get(url, params={'q': query, 'maxResults': 50}, timeout=10)
+    resp = auth_session.get(url, params={'q': query, 'maxResults': 100}, timeout=10)
     resp.raise_for_status()
     results = resp.json()
     return results.get('messages', [])

@@ -74,8 +74,8 @@ class TestAnalyzeNewsWithLLM(unittest.TestCase):
         self.assertTrue("Gemini API model is not configured" in str(context.exception))
 
     def test_too_large_content(self):
-        # Length > 800000
-        large_text = "a" * 800001
+        # Length > 1500000
+        large_text = "a" * 1500001
         main.model = self.mock_model
         result = main.analyze_news_with_llm(large_text)
         self.assertEqual(result.get("error"), "Too much newsletter content to process at once. Please reduce your lookback window in settings.")
