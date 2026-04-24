@@ -107,7 +107,10 @@ def add_security_headers(response):
 
 # Enable detailed error messages in development
 if os.environ.get("FLASK_ENV") != "production":
-    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+    if os.environ.get("ALLOW_INSECURE_OAUTH") == "1":
+        os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+    elif "OAUTHLIB_INSECURE_TRANSPORT" in os.environ:
+        del os.environ["OAUTHLIB_INSECURE_TRANSPORT"]
     app.config['DEBUG'] = True
     app.config['PROPAGATE_EXCEPTIONS'] = True
 else:
