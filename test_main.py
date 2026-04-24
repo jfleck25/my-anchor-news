@@ -107,5 +107,33 @@ class TestOptimization(unittest.TestCase):
         self.assertTrue(hasattr(main, '_worker_thread_locals'))
         self.assertIsInstance(main._worker_thread_locals, type(threading.local()))
 
+
+class TestGenerateAudio(unittest.TestCase):
+    def setUp(self):
+        import main
+        main.app.config['TESTING'] = True
+        self.client = main.app.test_client()
+
+    @patch('main.get_user_info')
+    def test_generate_audio_no_credentials(self, mock_get_user_info):
+        response = self.client.post('/api/generate_audio', json={"key": "val"})
+        self.assertEqual(response.status_code, 401)
+        self.assertIn('Please log in to generate audio.', response.get_data(as_text=True))
+
+    @patch('main.get_user_info')
+    def test_generate_audio_session_expired(self, mock_get_user_info):
+        with self.client.session_transaction() as sess:
+            sess['credentials'] = {'token': 'valid'}
+
+        def side_effect():
+            from flask import session
+            session.pop('credentials', None)
+            return None
+        mock_get_user_info.side_effect = side_effect
+
+        response = self.client.post('/api/generate_audio', json={"key": "val"})
+        self.assertEqual(response.status_code, 401)
+        self.assertIn('Your session expired. Please log in again.', response.get_data(as_text=True))
+
 if __name__ == '__main__':
     unittest.main()
