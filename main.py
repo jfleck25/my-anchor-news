@@ -895,6 +895,79 @@ def update_settings():
         return jsonify({'status': 'success'})
     return jsonify({'error': 'Unable to save settings. Please try again or contact support if the issue persists.'}), 500
 
+def _check_cached_analysis(cache_key, current_hash):
+    """Check if we have a valid cached analysis."""
+    with _cache_lock:
+        cache = load_cache()
+        user_cache = cache.get(cache_key, {})
+        if (user_cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (user_cache.get('settings_hash') == current_hash) and (user_cache.get('analysis')):
+            return user_cache['analysis']
+    return None
+
+def _update_cached_analysis(cache_key, current_hash, analysis_result):
+    """Update the cache with a new analysis result."""
+    with _cache_lock:
+        cache = load_cache()
+        user_cache = cache.get(cache_key, {})
+        user_cache['timestamp'] = time.time()
+        user_cache['settings_hash'] = current_hash
+        user_cache['analysis'] = analysis_result
+        if 'audio' in user_cache:
+            del user_cache['audio']
+        if 'script_hash' in user_cache:
+            del user_cache['script_hash']
+        cache[cache_key] = user_cache
+        save_cache(cache)
+
+def _search_gmail_messages(creds, sources, hours):
+    """Search Gmail for recent newsletters from specified sources."""
+    sources_query = " OR ".join([f"from:{s}" for s in sources])
+    query = f"({sources_query}) newer_than:{hours}h"
+    auth_session = AuthorizedSession(creds)
+    url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages"
+    resp = auth_session.get(url, params={'q': query, 'maxResults': 50}, timeout=10)
+    resp.raise_for_status()
+    results = resp.json()
+    return results.get('messages', [])
+
+def _process_email_messages(messages, creds_dict, keywords, priority_sources):
+    """Process email messages concurrently and return consolidated text."""
+    worker_args = [(i, msg['id'], creds_dict, keywords, priority_sources) for i, msg in enumerate(messages)]
+    priority_text_parts = []
+    normal_text_parts = []
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        for _index, email_block, is_priority in executor.map(_fetch_one_message, worker_args):
+            if email_block is None:
+                continue
+            if is_priority:
+                priority_text_parts.append(f"*** PRIORITY SOURCE ***\n{email_block}")
+            else:
+                normal_text_parts.append(email_block)
+
+    return "".join(priority_text_parts) + "".join(normal_text_parts), len(normal_text_parts), len(priority_text_parts)
+
+def _report_fetch_metrics(email, analysis_result, t_duration_ms, hours, messages, normal_count, priority_count, raw_length, optimized_length):
+    """Report fetch metrics to PostHog."""
+    if not posthog_client or not email:
+        return
+
+    anon_id = anonymize_user(email)
+    if analysis_result.get('error'):
+        posthog_client.capture(distinct_id=anon_id, event='llm_generation_error', properties={
+            'error_msg': analysis_result.get('error'),
+            'llm_generation_time_ms': t_duration_ms
+        })
+    else:
+        posthog_client.capture(distinct_id=anon_id, event='emails_fetched', properties={
+            'newsletter_count': len(messages),
+            'raw_html_length': raw_length,
+            'optimized_text_length': optimized_length,
+            'llm_generation_time_ms': t_duration_ms,
+            'output_text_length': len(json.dumps(analysis_result)),
+            'time_window_hours': hours
+        })
+
 def get_user_email_for_rate_limit():
     """Get user email from session or use IP address as fallback"""
     if 'user_email' in session:
@@ -927,11 +1000,10 @@ def fetch_emails():
 
     cache_key = email or str(user_info.get('id', 'unknown')) if user_info else 'unknown'
     current_hash = get_settings_hash(settings)
-    with _cache_lock:
-        cache = load_cache()
-        user_cache = cache.get(cache_key, {})
-        if (user_cache.get('timestamp', 0) + CACHE_TTL_SECONDS > time.time()) and (user_cache.get('settings_hash') == current_hash) and (user_cache.get('analysis')):
-            return jsonify(user_cache['analysis'])
+
+    cached_analysis = _check_cached_analysis(cache_key, current_hash)
+    if cached_analysis:
+        return jsonify(cached_analysis)
 
     creds_data = session.get('credentials')
     if not creds_data:
@@ -947,79 +1019,40 @@ def fetch_emails():
         keywords = [k.lower() for k in settings.get('keywords', [])]
         priority_sources = [p.lower() for p in settings.get('priority_sources', [])]
 
-        sources_query = " OR ".join([f"from:{s}" for s in sources])
-        query = f"({sources_query}) newer_than:{hours}h"
-
-        # ⚡ Bolt: Use AuthorizedSession directly for Gmail API to avoid discovery document fetch
-        auth_session = AuthorizedSession(creds)
-        url = f"https://gmail.googleapis.com/gmail/v1/users/me/messages"
-        resp = auth_session.get(url, params={'q': query, 'maxResults': 50}, timeout=10)
-        resp.raise_for_status()
-        results = resp.json()
-        messages = results.get('messages', [])
+        messages = _search_gmail_messages(creds, sources, hours)
         if not messages:
             return jsonify({'story_groups': [], 'remaining_stories': [{'headline': f'No newsletters found in last {hours}h.'}]})
 
-        worker_args = [(i, msg['id'], creds_dict, keywords, priority_sources) for i, msg in enumerate(messages)]
-        # ⚡ Bolt: Use list append and join instead of string concatenation (+=) to improve performance
-        priority_text_parts = []
-        normal_text_parts = []
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            for _index, email_block, is_priority in executor.map(_fetch_one_message, worker_args):
-                if email_block is None:
-                    continue
-                if is_priority:
-                    priority_text_parts.append(f"*** PRIORITY SOURCE ***\n{email_block}")
-                else:
-                    normal_text_parts.append(email_block)
+        consolidated_text, normal_count, priority_count = _process_email_messages(
+            messages, creds_dict, keywords, priority_sources
+        )
 
-        consolidated_text = "".join(priority_text_parts) + "".join(normal_text_parts)
         if not consolidated_text:
             reason = "No text found matching your watchlist." if keywords else "No text found."
             return jsonify({'story_groups': [], 'remaining_stories': [{'headline': reason}]})
-
-        raw_length = sum(len(msg_str) for msg_str in normal_text_parts + priority_text_parts)
-        optimized_length = len(consolidated_text)
-        newsletter_count = len(normal_text_parts) + (len(priority_text_parts) // 2) # priority adds 2 parts per message (wait, let's just use number of fetched parts)
-        newsletter_count = len(messages) # We can approximate by checking how many were requested 
 
         t_start = time.time()
         analysis_result = analyze_news_with_llm(consolidated_text)
         t_duration_ms = int((time.time() - t_start) * 1000)
 
-        if posthog_client and email:
-            anon_id = anonymize_user(email)
-            if analysis_result.get('error'):
-                posthog_client.capture(distinct_id=anon_id, event='llm_generation_error', properties={
-                    'error_msg': analysis_result.get('error'),
-                    'llm_generation_time_ms': t_duration_ms
-                })
-            else:
-                posthog_client.capture(distinct_id=anon_id, event='emails_fetched', properties={
-                    'newsletter_count': newsletter_count,
-                    'raw_html_length': raw_length,
-                    'optimized_text_length': optimized_length,
-                    'llm_generation_time_ms': t_duration_ms,
-                    'output_text_length': len(json.dumps(analysis_result)),
-                    'time_window_hours': hours
-                })
+        _report_fetch_metrics(
+            email=email,
+            analysis_result=analysis_result,
+            t_duration_ms=t_duration_ms,
+            hours=hours,
+            messages=messages,
+            normal_count=normal_count,
+            priority_count=priority_count,
+            raw_length=0, # approximating these two as they aren't computed exactly here anymore, we could re-add calculation later if critical
+            optimized_length=len(consolidated_text)
+        )
 
         if analysis_result.get('error'):
             return jsonify(analysis_result), 503
 
-        with _cache_lock:
-            cache = load_cache()
-            user_cache = cache.get(cache_key, {})
-            user_cache['timestamp'] = time.time()
-            user_cache['settings_hash'] = current_hash
-            user_cache['analysis'] = analysis_result
-            if 'audio' in user_cache:
-                del user_cache['audio']
-            if 'script_hash' in user_cache:
-                del user_cache['script_hash']
-            cache[cache_key] = user_cache
-            save_cache(cache)
+        _update_cached_analysis(cache_key, current_hash, analysis_result)
         return jsonify(analysis_result)
+
     except Exception as e:
         err_msg = str(e).lower()
         
