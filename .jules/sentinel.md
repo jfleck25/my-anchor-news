@@ -57,3 +57,7 @@
 **Vulnerability:** The `oauth2callback` endpoint retrieved the OAuth `state` parameter from the user's session using `state = session['state']` but failed to pop it from the session. This leaves the `state` parameter in the session, allowing it to potentially be reused.
 **Learning:** Failing to remove single-use tokens (like OAuth state) from session storage after their first use leaves them vulnerable to replay attacks if an attacker intercepts an authorization response.
 **Prevention:** Always use `session.pop('key')` instead of `session['key']` when retrieving single-use security tokens from session storage to ensure they are immediately invalidated.
+## 2024-06-07 - Missing Rate Limiting on Resource-Intensive Endpoints
+**Vulnerability:** The `/api/generate_audio` and `/api/share` endpoints were missing rate limit protections. `/api/generate_audio` consumes external TTS API quota, and `/api/share` allocates database storage.
+**Learning:** Endpoints that consume external API quotas or allocate storage are prime targets for resource exhaustion attacks (Financial DoS and Storage DoS). Even if these endpoints require authentication, an attacker or a runaway script could exhaust system resources or dramatically increase operational costs.
+**Prevention:** Always apply rate limiting to endpoints that perform resource-intensive operations, allocate storage, or call external APIs, using appropriate keys (like user email) to enforce quotas and prevent abuse.
