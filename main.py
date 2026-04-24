@@ -63,7 +63,7 @@ else:
 # --- Configuration & Constants ---
 MOCK_MODE = os.environ.get("MOCK_MODE", "false").lower() == "true"
 if MOCK_MODE:
-    print(" * [DEMO MODE] Google OAuth and API calls are bypassed.")
+    print(" * [DEMO MODE] Interactive demo button enabled.")
 
 app = flask.Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
@@ -399,14 +399,15 @@ if not PROJECT_ID:
     except: pass
 
 api_key = os.environ.get("GOOGLE_API_KEY")
-if api_key and not MOCK_MODE:
+if api_key:
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-2.5-flash-lite')
-    except Exception:
+    except Exception as e:
+        print(f"ERROR: Failed to initialize Gemini model: {e}")
         model = None
 else:
-    if not api_key and not MOCK_MODE:
+    if not MOCK_MODE:
         print("CRITICAL: GOOGLE_API_KEY is missing from environment variables!")
     model = None
 

@@ -418,7 +418,7 @@
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                     Try Interactive Demo
                                 </a>
-                                <p className="mt-3 text-center text-xs text-slate-400">Demo mode uses sample data — no Google account required.</p>
+                                <p className="mt-3 text-center text-xs text-slate-400">Demo mode uses sample data. Login with your email for higher quality voice audio.</p>
                             </>
                         )}
                     </div>
@@ -519,6 +519,19 @@
                 </div>
             );
         };
+
+        const DemoBanner = () => (
+            <div className="mb-8 p-4 bg-amber-50 dark:bg-amber-900/20 border-2 border-dashed border-amber-400 dark:border-amber-500 rounded-xl flex flex-col sm:flex-row items-center gap-4 animate-[fadeIn_0.5s_ease-out]">
+                <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/40 rounded-full flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                    <Icons.Mic />
+                </div>
+                <div className="flex-1 text-center sm:text-left">
+                    <p className="text-sm text-amber-900 dark:text-amber-100 font-medium leading-relaxed">
+                        <strong>Demo Mode:</strong> You're viewing sample briefing data. <a href="/login" className="underline font-bold hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Log in with your email</a> to access higher quality voice for the audio.
+                    </p>
+                </div>
+            </div>
+        );
 
         const Dashboard = ({ userInfo, sharedData, isMockSession }) => {
             const [analysis, setAnalysis] = React.useState(sharedData || null);
@@ -1260,6 +1273,7 @@
                     )}
 
                     <main id="main-content" tabIndex="-1" className="px-4 sm:px-6 max-w-[1200px] mx-auto focus:outline-none">
+                        {isMockSession && <DemoBanner />}
                         {!sharedData && (
                             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 border-b border-slate-200 dark:border-slate-800 pb-8">
                                 <div className="text-center sm:text-left">
