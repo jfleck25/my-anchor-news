@@ -493,17 +493,32 @@ def analyze_news_with_llm(newsletters_text):
 
 # --- Caching Helpers ---
 # File-based cache is ephemeral on Render and not shared across workers; treat as best-effort.
+_in_memory_cache = None
+_in_memory_cache_mtime = 0
+
 def load_cache():
+    global _in_memory_cache, _in_memory_cache_mtime
     if not os.path.exists(CACHE_FILE): return {}
     try:
+        # ⚡ Bolt: Cache file-based data in memory to avoid repeated JSON parsing overhead
+        mtime = os.path.getmtime(CACHE_FILE)
+        if _in_memory_cache is not None and _in_memory_cache_mtime == mtime:
+            return copy.deepcopy(_in_memory_cache)
+
         with open(CACHE_FILE, 'r') as f:
-            return json.load(f)
+            _in_memory_cache = json.load(f)
+            _in_memory_cache_mtime = mtime
+            return copy.deepcopy(_in_memory_cache)
     except Exception:
         return {}
 
 def save_cache(data):
+    global _in_memory_cache, _in_memory_cache_mtime
     try: 
         with open(CACHE_FILE, 'w') as f: json.dump(data, f)
+        # Update in-memory cache to avoid re-reading the file we just wrote
+        _in_memory_cache = copy.deepcopy(data)
+        _in_memory_cache_mtime = os.path.getmtime(CACHE_FILE)
     except Exception as e:
         pass
 

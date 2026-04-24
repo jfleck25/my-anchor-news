@@ -20,3 +20,7 @@
 ## $(date +%Y-%m-%d) - Optimize JSON parsing overhead via file memory caching
 **Learning:** In scenarios where local settings or state are read from disk (`user_settings.json`) across many requests, repeatedly calling `json.load()` imposes both I/O latency and CPU overhead for parsing JSON.
 **Action:** Implement an in-memory cache protected by a thread lock and invalidated via `os.path.getmtime(filepath)`. Return a deep copy (`copy.deepcopy()`) of the cached dictionary to prevent state leakage and mutation from callers. This can drastically reduce overhead (e.g., from ~0.37ms to ~0.11ms on a cache hit).
+
+## $(date +%Y-%m-%d) - Optimize JSON cache reading via mtime and deepcopy
+**Learning:** For large local JSON cache files (e.g., containing base64 audio), constantly invoking `json.load()` results in high CPU and I/O overhead. While `json.loads(json.dumps())` might sometimes be considered faster for deep recursive objects, `copy.deepcopy()` is incredibly fast for flat dictionaries containing massive strings, as it only copies pointers to the immutable string buffers.
+**Action:** Use an in-memory variable to store the parsed dictionary and invalidate it by checking `os.path.getmtime(CACHE_FILE)`. Return `copy.deepcopy()` of the cache object to protect global state without incurring the heavy cost of JSON string parsing on every cache hit.
