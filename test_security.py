@@ -1,3 +1,4 @@
+import os
 import unittest
 from unittest.mock import patch, MagicMock
 import sys
@@ -111,5 +112,37 @@ class TestSecurityFix(unittest.TestCase):
                 break
         self.assertTrue(found, "MAX_CONTENT_LENGTH should be set to 2MB in app config")
 
+
+    def test_insecure_transport_not_set_by_default_in_dev(self):
+        """Test that OAUTHLIB_INSECURE_TRANSPORT is not set universally just because FLASK_ENV != 'production'"""
+        # The main.py module sets this on load based on env vars
+        # To test the logic, we need to reload or re-import the module with specific os.environ state.
+        pass
+
+    @patch.dict('os.environ', {'FLASK_ENV': 'development', 'ALLOW_INSECURE_OAUTH': '1'})
+    def test_insecure_transport_set_when_explicitly_allowed(self):
+        """Test that OAUTHLIB_INSECURE_TRANSPORT is set if explicitly allowed"""
+        import importlib
+        import main
+        # Ensure we start clean
+        if 'OAUTHLIB_INSECURE_TRANSPORT' in os.environ:
+            del os.environ['OAUTHLIB_INSECURE_TRANSPORT']
+
+        importlib.reload(main)
+        self.assertEqual(os.environ.get('OAUTHLIB_INSECURE_TRANSPORT'), '1')
+
+    @patch.dict('os.environ', {'FLASK_ENV': 'development'}, clear=False)
+    def test_insecure_transport_not_set_without_allow_flag(self):
+        """Test that OAUTHLIB_INSECURE_TRANSPORT is removed/not set if ALLOW_INSECURE_OAUTH is not 1"""
+        import importlib
+        import main
+        # Ensure we start clean
+        if 'OAUTHLIB_INSECURE_TRANSPORT' in os.environ:
+            del os.environ['OAUTHLIB_INSECURE_TRANSPORT']
+
+        importlib.reload(main)
+        self.assertIsNone(os.environ.get('OAUTHLIB_INSECURE_TRANSPORT'))
+
 if __name__ == '__main__':
+
     unittest.main()

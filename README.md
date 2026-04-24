@@ -6,11 +6,13 @@ My Anchor is a personalized AI-powered daily news briefing application. It secur
 
 - **Email Integration**: Authenticate with Google to fetch newsletters and news emails.
 - **AI Analysis**: Uses Google's Gemini LLM to summarize and analyze your emails, highlighting top stories, source perspectives, and in-brief items.
-- **Audio Generation**: Converts the text briefing into an engaging audio podcast using Google Cloud Text-to-Speech.
+- **Trust-First Design**: A modern `slate/amber` UI emphasizing intelligence over noise, featuring a split-pane layout to compare differing source perspectives side-by-side.
+- **Audio Generation**: Converts the text briefing into an engaging audio podcast using Google Cloud Text-to-Speech. Single-story groups are now fully supported in audio generation.
 - **Personalized Configuration**: Customize your anchor personality (e.g., Professional, Conversational, Humorous), prioritize specific sources, and set up watchlists for topics.
 - **Sharing**: Generate shareable links to your daily briefings.
 - **Dark Mode**: Toggleable dark mode interface for comfortable reading.
 - **PDF Export**: Download your briefing as a PDF document.
+- **Synthetic Audio Testing**: Use `scripts/generate_demo_audio.py` to create sample audio for UI development without hitting live API endpoints.
 
 ## Prerequisites
 
