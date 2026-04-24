@@ -13,3 +13,14 @@
 ## $(date +%Y-%m-%d) - Optimize TTS chunking string accumulation
 **Learning:** In text-to-speech script chunking, string concatenation `+=` within a loop combined with repeatedly encoding the entire accumulating string to check its byte length results in O(N^2) time complexity. For large briefing scripts, this becomes a CPU bottleneck.
 **Action:** Use the string builder pattern (`.append()` parts to a list, then `"".join()`) and maintain a running sum of bytes (by only encoding the newly added piece) rather than re-evaluating the whole chunk's length on each iteration.
+## 2024-05-14 - Replace googleapiclient.discovery.build() with AuthorizedSession for performance
+**Learning:** Using `googleapiclient.discovery.build()` for Gmail API calls synchronously downloads a large JSON discovery document. In a `ThreadPoolExecutor` where thread locals are used (e.g. `_worker_thread_locals`), this expensive network call is repeated for *every* thread, drastically slowing down parallel execution.
+**Action:** When making simple, statically known Google API calls, replace `discovery.build()` with `google.auth.transport.requests.AuthorizedSession` to make direct REST calls. It preserves token refreshment logic while eliminating discovery overhead. Ensure `AuthorizedSession` is imported (`from google.auth.transport.requests import AuthorizedSession`).
+
+## $(date +%Y-%m-%d) - Optimize JSON parsing overhead via file memory caching
+**Learning:** In scenarios where local settings or state are read from disk (`user_settings.json`) across many requests, repeatedly calling `json.load()` imposes both I/O latency and CPU overhead for parsing JSON.
+**Action:** Implement an in-memory cache protected by a thread lock and invalidated via `os.path.getmtime(filepath)`. Return a deep copy (`copy.deepcopy()`) of the cached dictionary to prevent state leakage and mutation from callers. This can drastically reduce overhead (e.g., from ~0.37ms to ~0.11ms on a cache hit).
+
+## $(date +%Y-%m-%d) - Optimize JSON parsing overhead via file memory caching (String caching over deepcopy)
+**Learning:** In scenarios where local settings or state are read from disk (`cache.json`) across many requests, repeatedly calling `json.load()` imposes both I/O latency and CPU overhead for parsing JSON. While `copy.deepcopy()` on a parsed dictionary prevents state leakage, storing the raw JSON string in memory and parsing it on retrieval with `json.loads()` is significantly faster than `copy.deepcopy()` (e.g. ~47ms vs ~127ms) while safely generating a fresh dictionary each time.
+**Action:** When implementing in-memory caching for JSON files, cache the raw file contents (`f.read()`) instead of the parsed dictionary, and return `json.loads(cached_string)`. This naturally prevents state leakage and takes advantage of Python's fast C-based JSON parser.

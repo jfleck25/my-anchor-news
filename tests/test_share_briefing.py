@@ -9,7 +9,7 @@ MOCKED_MODULES = [
     'google', 'google.oauth2', 'google.oauth2.credentials', 'googleapiclient',
     'googleapiclient.discovery', 'google.generativeai', 'google.cloud',
     'google.api_core', 'bs4', 'google.auth', 'google.auth.transport',
-    'google.auth.transport.requests', 'psycopg2', 'psycopg2.extras',
+    'google.auth.transport.requests', 'google.api_core.exceptions', 'psycopg2', 'psycopg2.extras',
     'psycopg2.pool',
     'sentry_sdk', 'sentry_sdk.integrations', 'sentry_sdk.integrations.flask'
 ]
@@ -24,7 +24,9 @@ class TestShareBriefing(unittest.TestCase):
             def decorator(f):
                 return f
             return decorator
-        mock_limiter.limit.return_value = limit_decorator
+        # Actually set the limit method to our fake decorator directly on the mock instance
+        mock_limiter.limit = limit_decorator
+
         mock_flask_limiter = MagicMock()
         mock_flask_limiter.Limiter.return_value = mock_limiter
         self.mocks['flask_limiter'] = mock_flask_limiter

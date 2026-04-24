@@ -11,35 +11,36 @@
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                        serif: ['Outfit', 'sans-serif'], // Updated to a more modern sans-serif feel
+                        display: ['Instrument Serif', 'Georgia', 'serif'],
+                        body: ['Geist', 'Inter', 'sans-serif'],
+                        mono: ['Geist Mono', 'monospace'],
                     },
                     colors: {
-                        brand: {
-                            50: '#f5f3ff',
-                            100: '#ede9fe',
-                            500: '#8b5cf6', // Primary Accent: Vibrant Purple
-                            600: '#7c3aed',
-                            700: '#6d28d9',
-                            900: '#4c1d95',
+                        slate: {
+                            50: '#F8FAFC',
+                            900: '#0F172A',
+                            950: '#020617', // For dark mode
                         },
-                        danger: {
-                            50: '#fef2f2',
-                            100: '#fee2e2',
-                            500: '#ef4444',
-                            600: '#dc2626',
-                            700: '#b91c1c',
+                        amber: {
+                            500: '#F59E0B',
                         },
-                        background: {
-                            dark: '#0A0A0A', // Deep Dark Background
-                            elevated: '#17171777', // Translucent Cards
+                        emerald: {
+                            500: '#10B981',
+                        },
+                        rose: {
+                            500: '#F43F5E',
+                        },
+                        blue: {
+                            500: '#3B82F6',
                         }
                     }
                 }
             }
         }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&display=swap" rel="stylesheet">
     <!-- PostHog Analytics (set POSTHOG_API_KEY in env to enable) -->
     <script>
         !function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures getActiveMatchingSurveys getSurveys onSessionId".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);
@@ -79,51 +80,26 @@
         })();
     </script>
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        
-        /* Premium Typography Hierarchy */
-        h1 { font-size: 32px; font-weight: 700; color: white !important; }
-        h2 { font-size: 24px; font-weight: 500; }
-        p { font-size: 16px; }
-        .text-body { color: #94a3b8; } /* text-gray-400 equivalent */
+        body {
+            font-family: 'Geist', 'Inter', sans-serif;
+            background-color: #F8FAFC;
+        }
+
+        .dark body {
+            background-color: #0F172A; /* slate-900 */
+        }
 
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         
-        /* Glassmorphism Styles */
-        .glass {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(16px) saturate(180%);
-            -webkit-backdrop-filter: blur(16px) saturate(180%);
+        /* Audio Player Waveform Stub */
+        .waveform {
+            height: 40px;
+            background: repeating-linear-gradient(90deg, #334155 0, #334155 2px, transparent 2px, transparent 8px);
         }
         
-        .dark .glass {
-            background: rgba(23, 23, 23, 0.6);
-            backdrop-filter: blur(16px) saturate(180%);
-            -webkit-backdrop-filter: blur(16px) saturate(180%);
-            border-color: rgba(255, 255, 255, 0.08);
-        }
-
-        .premium-card {
-            background: rgba(23, 23, 23, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            transition: all 0.3s ease;
-        }
-
-        .dark .premium-card {
-            background: rgba(23, 23, 23, 0.45);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .dark .premium-card:hover {
-            border-color: #8b5cf666;
-            background: rgba(23, 23, 23, 0.6);
-        }
-
-        /* Responsive Audio Bar Smoothing */
-        #audio-player-bar {
-            box-shadow: 0 -10px 40px -10px rgba(0,0,0,0.5);
+        .dark .waveform {
+            background: repeating-linear-gradient(90deg, #475569 0, #475569 2px, transparent 2px, transparent 8px);
         }
 
         ::-webkit-scrollbar { width: 8px; }
@@ -136,7 +112,7 @@
         }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 dark:bg-[#0A0A0A] dark:text-slate-200 antialiased transition-colors duration-200">
+<body class="text-slate-900 dark:text-slate-100 antialiased transition-colors duration-200">
     <div id="root"></div>
 
     <!-- React: production UMD when Flask debug is off (smaller, faster; dev build when debugging) -->
@@ -150,6 +126,7 @@
     <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <script type="text/babel">
+        const MOCK_MODE = {{ 'true' if mock_mode else 'false' }};
     /* {% raw %} */
         // --- Configuration ---
         const backendUrl = "";
@@ -178,6 +155,7 @@
             Moon: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>,
             Sun: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>,
             Play: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
+            Pause: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>,
             Refresh: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>,
             Share: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>,
             Copy: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
@@ -284,11 +262,11 @@
             }, [isOpen, onClose]);
 
             return (
-                <div ref={modalRef} className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200 dark:border-slate-700 transform transition-all flex flex-col max-h-[90vh]">
-                        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 shrink-0">
-                            <h3 className="text-lg font-semibold text-slate-800 dark:text-white font-sans">Configuration</h3>
-                            <button onClick={onClose} className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" aria-label="Close">
+                <div ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+                    <div className="bg-white dark:bg-slate-900 border-2 border-slate-900 dark:border-slate-100 shadow-2xl w-full max-w-lg overflow-hidden transform transition-all flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                        <div className="px-6 py-4 border-b-2 border-slate-900 dark:border-slate-100 flex justify-between items-center bg-white dark:bg-slate-900 shrink-0">
+                            <h3 id="settings-modal-title" className="font-display italic text-3xl text-slate-900 dark:text-white font-normal tracking-tight">Configuration</h3>
+                            <button onClick={onClose} className="p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" aria-label="Close">
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                             </button>
                         </div>
@@ -303,7 +281,7 @@
                                     id="anchor-personality"
                                     value={personality} 
                                     onChange={(e) => setPersonality(e.target.value)}
-                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-sm rounded-lg focus-visible:ring-brand-500 focus-visible:border-brand-500 block p-2.5"
+                                    className="w-full bg-slate-50 dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-sm focus-visible:ring-amber-500 focus-visible:border-amber-500 block p-2.5"
                                 >
                                     <option value="anchor">The Anchor (Professional)</option>
                                     <option value="analyst">The Analyst (Fast, Deep)</option>
@@ -318,7 +296,7 @@
                                     id="lookback-period"
                                     value={timeWindow} 
                                     onChange={(e) => setTimeWindow(e.target.value)}
-                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-sm rounded-lg focus-visible:ring-brand-500 focus-visible:border-brand-500 block p-2.5"
+                                    className="w-full bg-slate-50 dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-sm focus-visible:ring-amber-500 focus-visible:border-amber-500 block p-2.5"
                                 >
                                     <option value="12">Last 12 Hours</option>
                                     <option value="24">Last 24 Hours</option>
@@ -340,16 +318,16 @@
                                         onChange={(e) => setNewKeyword(e.target.value)}
                                         onKeyDown={(e) => handleKeyDown(e, handleAddKeyword)} 
                                         placeholder="e.g. Apple, Interest Rates"
-                                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-sm rounded-lg focus-visible:ring-brand-500 focus-visible:border-brand-500 block p-2.5"
+                                        className="flex-1 bg-slate-50 dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-sm focus-visible:ring-amber-500 focus-visible:border-amber-500 block p-2.5"
                                     />
-                                    <button onClick={handleAddKeyword} disabled={!newKeyword.trim()} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-800 dark:text-white rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed">Add</button>
+                                    <button onClick={handleAddKeyword} disabled={!newKeyword.trim()} title={!newKeyword.trim() ? "Enter a keyword to add" : ""} className="px-4 py-2 font-mono text-xs uppercase tracking-widest font-bold border-2 border-slate-900 dark:border-white text-slate-900 dark:text-white hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">Add</button>
                                 </div>
                                 {keywords.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mb-2">
                                         {keywords.map(k => (
                                             <span key={k} className="px-2 py-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 rounded text-xs flex items-center gap-1">
                                                 {k}
-                                                <button aria-label={`Remove keyword ${k}`} onClick={() => handleRemoveKeyword(k)} className="hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-sm ml-1"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                                                <button aria-label={`Remove keyword ${k}`} onClick={() => handleRemoveKeyword(k)} className="hover:text-red-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-sm ml-1"><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
                                             </span>
                                         ))}
                                     </div>
@@ -367,9 +345,9 @@
                                         onChange={(e) => setNewSource(e.target.value)}
                                         onKeyDown={(e) => handleKeyDown(e, handleAddSource)} 
                                         placeholder="e.g. bloomberg.com"
-                                        className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-sm rounded-lg focus-visible:ring-brand-500 focus-visible:border-brand-500 block p-2.5"
+                                        className="flex-1 bg-slate-50 dark:bg-slate-900 border-2 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100 text-sm focus-visible:ring-amber-500 focus-visible:border-amber-500 block p-2.5"
                                     />
-                                    <button onClick={handleAddSource} disabled={!newSource.trim()} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900 disabled:opacity-50 disabled:cursor-not-allowed">Add</button>
+                                    <button onClick={handleAddSource} disabled={!newSource.trim()} title={!newSource.trim() ? "Enter a source to add" : ""} className="px-4 py-2 font-mono text-xs uppercase tracking-widest font-bold border-2 border-slate-900 dark:border-white text-slate-900 dark:text-white hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">Add</button>
                                 </div>
                                 <div className="bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 p-2 max-h-40 overflow-y-auto">
                                     {sources.length === 0 ? (
@@ -378,18 +356,18 @@
                                         sources.map(source => {
                                             const isPriority = prioritySources.includes(source);
                                             return (
-                                                <div key={source} className="flex justify-between items-center p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-800 group transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+                                                <div key={source} className="flex justify-between items-center p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-800 group transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">
                                                     <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{source}</span>
                                                     <div className="flex items-center gap-2">
                                                         <button 
                                                             onClick={() => togglePriority(source)} 
-                                                            className={`p-1 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 ${isPriority ? 'text-yellow-500' : 'text-slate-300 hover:text-yellow-400'}`}
+                                                            className={`p-1 rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 ${isPriority ? 'text-yellow-500' : 'text-slate-300 hover:text-yellow-400'}`}
                                                             title={isPriority ? "Remove Priority" : "Mark as Priority"}
                                                             aria-label={isPriority ? `Remove priority from ${source}` : `Mark ${source} as priority`}
                                                         >
                                                             <Icons.Star filled={isPriority} />
                                                         </button>
-                                                        <button aria-label={`Remove source ${source}`} onClick={() => handleRemoveSource(source)} className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 rounded-sm transition-all">
+                                                        <button aria-label={`Remove source ${source}`} onClick={() => handleRemoveSource(source)} className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 rounded-sm transition-all">
                                                             <Icons.Trash />
                                                         </button>
                                                     </div>
@@ -401,9 +379,9 @@
                             </div>
                         </div>
 
-                        <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 shrink-0">
-                            <button onClick={onClose} className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Cancel</button>
-                            <button onClick={handleSave} className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90 rounded-lg text-sm font-medium transition-opacity shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Save Changes</button>
+                        <div className="px-6 py-4 bg-white dark:bg-slate-900 border-t-2 border-slate-900 dark:border-slate-100 flex justify-end gap-3 shrink-0">
+                            <button onClick={onClose} className="px-4 py-2 font-mono text-xs uppercase tracking-widest font-bold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">Cancel</button>
+                            <button onClick={handleSave} className="font-mono text-xs uppercase tracking-widest font-bold flex items-center gap-2 px-4 py-2 border-2 border-slate-900 dark:border-white text-slate-900 dark:text-white hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">Save Changes</button>
                         </div>
                     </div>
                 </div>
@@ -413,38 +391,50 @@
         // ... (Remainder of components: LoginPage, LoadingState, Dashboard, App - unchanged from last version) ...
         // Re-declaring below to ensure full file integrity
         const LoginPage = () => (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-brand-50/20 to-slate-50 dark:from-slate-900 dark:via-brand-900/10 dark:to-slate-900 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-slate-100/20 to-slate-50 dark:from-slate-900 dark:via-slate-800/10 dark:to-slate-900 relative overflow-hidden">
                 <div className="z-10 w-full max-w-md p-8 animate-[fadeIn_0.5s_ease-out]">
                     <div className="text-center mb-10">
-                        <div className="w-16 h-16 bg-gradient-to-br from-brand-600 to-indigo-600 rounded-2xl mx-auto flex items-center justify-center shadow-2xl shadow-brand-500/30 mb-6 rotate-3">
+                        <div className="w-16 h-16 bg-gradient-to-br from-slate-900 to-indigo-600 rounded-2xl mx-auto flex items-center justify-center shadow-2xl shadow-slate-900/30 mb-6 rotate-3">
                             <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 12h6m-1 8h.01" /></svg>
                         </div>
-                        <h1 className="text-4xl font-serif font-bold text-slate-900 dark:text-white mb-3">My Anchor</h1>
-                        <p className="text-slate-500 dark:text-slate-400 text-lg">Your personalized AI news analyst.</p>
+                        <h1 className="font-display italic text-5xl sm:text-6xl text-slate-900 dark:text-white font-normal tracking-tight mb-3">My Anchor</h1>
+                        <p className="font-mono text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold mb-6">Your personalized AI news analyst.</p>
                     </div>
                     
                     <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700">
-                        <a href={`${backendUrl}/login`} className="flex items-center justify-center w-full py-3.5 px-4 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-700 dark:text-white bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-500 transition-all duration-200 gap-3 font-medium">
+                        <a href={`${backendUrl}/login`} className="flex items-center justify-center w-full py-3.5 px-4 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-700 dark:text-white bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-500 transition-all duration-200 gap-3 font-medium">
                             <svg className="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
                             Continue with Google
                         </a>
-                        <p className="mt-6 text-center text-xs text-slate-400">By continuing, you agree to allow My Anchor to access your Gmail for analysis purposes only.</p>
+                        <p className="mt-4 text-center text-xs text-slate-400">By continuing, you agree to allow My Anchor to access your Gmail for analysis purposes only.</p>
+                        {MOCK_MODE && (
+                            <>
+                                <div className="flex items-center gap-3 my-5">
+                                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700"></div>
+                                    <span className="text-xs text-slate-400 font-mono uppercase tracking-wider">or</span>
+                                    <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700"></div>
+                                </div>
+                                <a href={`${backendUrl}/api/mock_login`} id="try-demo-btn" className="flex items-center justify-center w-full py-3.5 px-4 border-2 border-dashed border-amber-400 dark:border-amber-500 rounded-xl text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-500 transition-all duration-200 gap-3 font-medium">
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                    Try Interactive Demo
+                                </a>
+                                <p className="mt-3 text-center text-xs text-slate-400">Demo mode uses sample data. Login with your email for higher quality voice audio.</p>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
         );
 
         const LogoutPage = () => (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-brand-50/20 to-slate-50 dark:from-slate-900 dark:via-brand-900/10 dark:to-slate-900 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-full bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-slate-100/20 to-slate-50 dark:from-slate-900 dark:via-slate-800/10 dark:to-slate-900 relative overflow-hidden">
                 <div className="z-10 w-full max-w-md p-8 animate-[fadeIn_0.5s_ease-out] text-center">
                     <div className="w-16 h-16 bg-slate-200 dark:bg-slate-800 rounded-full mx-auto flex items-center justify-center mb-6 text-green-500">
                         <Icons.Check />
                     </div>
-                    <h1 className="text-4xl font-serif font-bold text-slate-900 dark:text-white mb-3">Logged Out</h1>
-                    <p className="text-slate-500 dark:text-slate-400 text-lg mb-8">You have been successfully logged out.</p>
-                    <a href="/" className="inline-flex items-center justify-center py-3.5 px-6 border border-transparent rounded-xl text-white bg-brand-600 hover:bg-brand-700 font-medium transition-colors">
+                    <h1 className="font-display italic text-5xl sm:text-6xl text-slate-900 dark:text-white font-normal tracking-tight mb-3">Logged Out</h1>
+                    <p className="font-mono text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold mb-8">You have been successfully logged out.</p>
+                    <a href="/" className="inline-flex items-center justify-center py-3.5 px-6 border border-transparent rounded-xl text-white bg-slate-900 hover:bg-slate-800 font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-500">
                         Return Home
                     </a>
                 </div>
@@ -454,9 +444,10 @@
         const LoadingState = ({ text }) => (
             <div className="flex flex-col items-center justify-center py-20 animate-pulse">
                 <div className="w-16 h-16 bg-slate-200 dark:bg-slate-700 rounded-full mb-4 relative">
-                    <div className="absolute inset-0 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
-                </div>
-                <p className="text-slate-500 dark:text-slate-400 font-medium">{text || "Processing..."}</p>
+                    <div className="absolute inset-0 border-4 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                    <p role="status" aria-live="polite" className="text-slate-500 dark:text-slate-400 font-medium">{text || "Processing..."}</p>
+
                 <div className="mt-8 space-y-4 w-full max-w-lg">
                     <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4 mx-auto"></div>
                     <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/2 mx-auto"></div>
@@ -464,45 +455,18 @@
             </div>
         );
 
-        const BriefingSkeleton = ({ stage }) => (
-            <div className="space-y-8 animate-pulse">
-                <div className="grid gap-8">
-                    {[1, 2].map((i) => (
-                        <div key={i} className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden p-6 md:p-8">
-                            <div className="h-6 w-24 bg-slate-200 dark:bg-slate-700 rounded-full mb-4"></div>
-                            <div className="h-8 bg-slate-200 dark:bg-slate-700 rounded w-3/4 mb-4 max-w-md"></div>
-                            <div className="space-y-2 mb-8">
-                                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-full"></div>
-                                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-5/6 max-w-lg"></div>
-                                <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-3/4 max-w-md"></div>
-                            </div>
-                            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-5">
-                                <div className="h-4 w-40 bg-slate-200 dark:bg-slate-700 rounded mb-4"></div>
-                                <div className="space-y-3">
-                                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-full"></div>
-                                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-5/6"></div>
-                                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-full"></div>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-                <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 p-6 md:p-8">
-                    <div className="h-6 w-24 bg-slate-200 dark:bg-slate-700 rounded mb-6"></div>
-                    <div className="grid sm:grid-cols-2 gap-6">
-                        {[1, 2, 3, 4].map((i) => (
-                            <div key={i} className="flex gap-3 items-start">
-                                <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0"></div>
-                                <div className="h-4 flex-1 bg-slate-200 dark:bg-slate-700 rounded"></div>
-                            </div>
-                        ))}
+        const BriefingSkeleton = ({ stage }) => {
+            return (
+                <div className="max-w-md mx-auto py-20 text-center">
+                    <div className="flex flex-col items-center gap-6">
+                        <div className="w-8 h-8 border-4 border-slate-200 border-t-amber-500 rounded-full animate-spin dark:border-slate-800 dark:border-t-amber-500"></div>
+                        <span className="font-mono text-xs uppercase tracking-widest font-bold text-slate-800 dark:text-slate-200 transition-all duration-500 ease-in-out">
+                            {stage}
+                        </span>
                     </div>
                 </div>
-                <div className="text-center py-4">
-                    <p className="text-slate-500 dark:text-slate-400 font-medium">{stage}</p>
-                </div>
-            </div>
-        );
+            );
+        };
 
         const OnboardingTour = ({ onClose }) => {
             const steps = [
@@ -535,17 +499,18 @@
                 return () => document.removeEventListener('keydown', onKey);
             }, [step, onClose]);
             return (
-                <div ref={tourRef} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true" aria-labelledby="tour-title">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl max-w-md w-full p-6 border border-slate-200 dark:border-slate-700">
-                        <h2 id="tour-title" className="text-xl font-serif font-bold text-slate-900 dark:text-white mb-2">{steps[step].title}</h2>
-                        <p className="text-slate-600 dark:text-slate-300 mb-6">{steps[step].body}</p>
+                <div ref={tourRef} className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" role="dialog" aria-modal="true" aria-labelledby="tour-title" onClick={finishTour}>
+                    <div className="bg-white dark:bg-slate-900 border-2 border-slate-900 dark:border-slate-100 shadow-xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+                        <h2 id="tour-title" className="font-display italic text-3xl text-slate-900 dark:text-white font-normal tracking-tight mb-2">{steps[step].title}</h2>
+                        <p className="font-body text-lg text-slate-600 dark:text-slate-300 mb-6">{steps[step].body}</p>
                         <div className="flex justify-between items-center">
                             <span className="text-xs text-slate-400">{step + 1} of {steps.length}</span>
                             <div className="flex gap-2">
                                 {!isLast ? (
-                                    <button onClick={() => setStep(s => s + 1)} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-medium rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Next</button>
+                                    <button onClick={() => setStep(s => s + 1)} className="font-mono text-xs uppercase tracking-widest font-bold flex items-center gap-2 px-4 py-2 border-2 border-slate-900 dark:border-white text-slate-900 dark:text-white hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">Next</button>
+
                                 ) : null}
-                                <button onClick={finishTour} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-800 dark:text-white font-medium rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+                                <button onClick={finishTour} className="font-mono text-xs uppercase tracking-widest font-bold flex items-center gap-2 px-4 py-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">
                                     {isLast ? 'Got it' : 'Skip'}
                                 </button>
                             </div>
@@ -555,9 +520,23 @@
             );
         };
 
-        const Dashboard = ({ userInfo, sharedData }) => {
+        const DemoBanner = () => (
+            <div className="mb-8 p-4 bg-amber-50 dark:bg-amber-900/20 border-2 border-dashed border-amber-400 dark:border-amber-500 rounded-xl flex flex-col sm:flex-row items-center gap-4 animate-[fadeIn_0.5s_ease-out]">
+                <div className="w-10 h-10 bg-amber-100 dark:bg-amber-900/40 rounded-full flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                    <Icons.Mic />
+                </div>
+                <div className="flex-1 text-center sm:text-left">
+                    <p className="text-sm text-amber-900 dark:text-amber-100 font-medium leading-relaxed">
+                        <strong>Demo Mode:</strong> You're viewing sample briefing data. <a href="/login" className="underline font-bold hover:text-amber-600 dark:hover:text-amber-400 transition-colors">Log in with your email</a> to access higher quality voice for the audio.
+                    </p>
+                </div>
+            </div>
+        );
+
+        const Dashboard = ({ userInfo, sharedData, isMockSession }) => {
             const [analysis, setAnalysis] = React.useState(sharedData || null);
             const [audioSrc, setAudioSrc] = React.useState(null);
+            const [webSpeechActive, setWebSpeechActive] = React.useState(false);
             const [isFetching, setIsFetching] = React.useState(false);
             const [isGeneratingAudio, setIsGeneratingAudio] = React.useState(false);
             const [isPreloadingAudio, setIsPreloadingAudio] = React.useState(false);
@@ -577,11 +556,14 @@
                     return window.matchMedia('(prefers-color-scheme: dark)').matches;
                 } catch (e) { return false; }
             });
-            const [fetchStage, setFetchStage] = React.useState('Scanning your inbox…');
+            const [fetchStage, setFetchStage] = React.useState('Analyzing newsletters...');
             const [showTour, setShowTour] = React.useState(false);
             const tourCheckDone = React.useRef(false);
 
             const audioRef = React.useRef(null);
+            const [audioProgress, setAudioProgress] = React.useState(0);
+            const [audioDuration, setAudioDuration] = React.useState(0);
+            const [isPlaying, setIsPlaying] = React.useState(true);
             const prefetchIdRef = React.useRef(0);
             const prefetchPromiseRef = React.useRef(null);
 
@@ -591,7 +573,7 @@
                 try { localStorage.setItem('myanchor-dark-mode', String(darkMode)); } catch (e) {}
             }, [darkMode]);
 
-            const stages = ['Scanning your inbox…', 'Analyzing key stories…', 'Building your briefing…'];
+            const stages = ['Analyzing newsletters...', 'Structuring your briefing...'];
             React.useEffect(() => {
                 if (!isFetching) return;
                 setFetchStage(stages[0]);
@@ -599,7 +581,7 @@
                 const t = setInterval(() => {
                     i = (i + 1) % stages.length;
                     setFetchStage(stages[i]);
-                }, 2500);
+                }, 2000);
                 return () => clearInterval(t);
             }, [isFetching]);
 
@@ -663,9 +645,12 @@
             };
 
             const handleFetchAndAnalyze = async () => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
                 setIsFetching(true);
                 setAnalysis(null);
                 setAudioSrc(null);
+                setWebSpeechActive(false);
+                if ('speechSynthesis' in window) window.speechSynthesis.cancel();
                 setPreloadedAudio(null);
                 setIsPreloadingAudio(false);
                 setError(null);
@@ -674,7 +659,8 @@
                 prefetchPromiseRef.current = null;
                 const startTime = Date.now();
                 try {
-                    const res = await fetch(`${backendUrl}/api/fetch_emails`, { credentials: 'include' });
+                    const fetchUrl = isMockSession ? `${backendUrl}/api/mock/fetch` : `${backendUrl}/api/fetch_emails`;
+                    const res = await fetch(fetchUrl, { credentials: 'include' });
                     if (res.status === 401) { window.location.href = '/login'; return; }
                     if (!res.ok) {
                         const errorData = await res.json().catch(() => ({}));
@@ -697,7 +683,8 @@
                     let resolvePrefetch;
                     prefetchPromiseRef.current = new Promise((resolve) => { resolvePrefetch = resolve; });
                     setIsPreloadingAudio(true);
-                    fetch(`${backendUrl}/api/generate_audio`, {
+                    const audioFetchUrl = isMockSession ? `${backendUrl}/api/mock/audio` : `${backendUrl}/api/generate_audio`;
+                    fetch(audioFetchUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ ...data, greeting: new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening' }),
@@ -762,7 +749,8 @@
                 setIsGeneratingAudio(true);
                 const startTime = Date.now();
                 try {
-                    const res = await fetch(`${backendUrl}/api/generate_audio`, {
+                    const audioUrl = isMockSession ? `${backendUrl}/api/mock/audio` : `${backendUrl}/api/generate_audio`;
+                    const res = await fetch(audioUrl, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ ...analysis, greeting: new Date().getHours() < 12 ? 'Good morning' : new Date().getHours() < 17 ? 'Good afternoon' : 'Good evening' }),
@@ -777,6 +765,37 @@
                         throw new Error(errorMsg);
                     }
                     const data = await res.json();
+                    // Web Speech API fallback (mock mode, no pre-generated MP3)
+                    if (data.use_web_speech && data.script) {
+                        if ('speechSynthesis' in window) {
+                            window.speechSynthesis.cancel();
+                            const utt = new SpeechSynthesisUtterance(data.script);
+
+                            const setAnchorVoice = () => {
+                                const voices = window.speechSynthesis.getVoices();
+                                // Try to find a premium male voice that closely matches "Anchor"
+                                const preferredVoice = voices.find(v =>
+                                    (v.lang.startsWith('en-US') || v.lang.startsWith('en-GB')) &&
+                                    (v.name.includes('Google US English') || v.name.includes('Male') || v.name.includes('David') || v.name.includes('Arthur'))
+                                );
+                                if (preferredVoice) utt.voice = preferredVoice;
+                                utt.rate = playbackRate;
+                                utt.pitch = 0.9; // Slightly lower pitch for more anchor-like authority
+                                utt.onend = () => setWebSpeechActive(false);
+                                utt.onerror = () => setWebSpeechActive(false);
+                                window.speechSynthesis.speak(utt);
+                                setWebSpeechActive(true);
+                            };
+
+                            if (window.speechSynthesis.getVoices().length > 0) {
+                                setAnchorVoice();
+                            } else {
+                                window.speechSynthesis.onvoiceschanged = setAnchorVoice;
+                            }
+                        }
+                        setIsGeneratingAudio(false);
+                        return;
+                    }
                     setAudioSrc(`data:audio/mp3;base64,${data.audio_content}`);
                     const generationTime = Date.now() - startTime;
                     ph('capture', 'audio_played', {
@@ -839,7 +858,7 @@
                     
                     analysis.story_groups.forEach((group, index) => {
                         text += `${index + 1}. ${group.group_headline.toUpperCase()}\n\n`;
-                        text += `   ${group.group_summary}\n\n`;
+                        text += `   ${group.consensus_summary || group.group_summary}\n\n`;
                         
                         if (group.stories && group.stories.length > 0) {
                             text += `   📊 Source Perspectives:\n`;
@@ -907,174 +926,193 @@
                     <html>
                     <head>
                         <title>My Anchor Briefing - ${today}</title>
+                        <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&display=swap" rel="stylesheet">
                         <style>
                             @media print {
-                                @page { margin: 1in; }
+                                @page { margin: 0.8in; }
+                                .story-headline { page-break-after: avoid; }
+                                .story-summary { page-break-before: avoid; }
+                            }
+                            * {
+                                box-sizing: border-box;
                             }
                             body {
-                                font-family: 'Georgia', serif;
+                                font-family: 'Geist', 'Inter', sans-serif;
                                 line-height: 1.6;
-                                color: #1e293b;
+                                color: #0f172a;
+                                background-color: #f8fafc;
                                 max-width: 800px;
                                 margin: 0 auto;
                                 padding: 40px 20px;
+                                -webkit-font-smoothing: antialiased;
                             }
                             .header {
-                                text-align: center;
-                                border-bottom: 3px solid #0ea5e9;
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: baseline;
+                                border-bottom: 2px solid #0f172a;
                                 padding-bottom: 20px;
                                 margin-bottom: 40px;
                             }
                             .header h1 {
-                                font-size: 32px;
-                                color: #0ea5e9;
-                                margin: 0 0 10px 0;
-                            }
-                            .header .subtitle {
-                                font-size: 14px;
-                                color: #64748b;
+                                font-family: 'Instrument Serif', serif;
                                 font-style: italic;
+                                font-size: 48px;
+                                font-weight: 400;
+                                color: #0f172a;
+                                margin: 0;
+                                letter-spacing: -0.02em;
                             }
                             .date {
-                                font-size: 16px;
-                                color: #475569;
-                                margin-top: 10px;
-                            }
-                            .section-title {
-                                font-size: 24px;
-                                color: #0f172a;
-                                border-bottom: 2px solid #e2e8f0;
-                                padding-bottom: 10px;
-                                margin: 30px 0 20px 0;
+                                font-family: 'Geist Mono', monospace;
+                                font-size: 12px;
+                                font-weight: bold;
+                                text-transform: uppercase;
+                                letter-spacing: 0.1em;
+                                color: #64748b;
                             }
                             .story {
-                                margin-bottom: 30px;
-                                page-break-inside: avoid;
-                            }
-                            .story-number {
-                                display: inline-block;
-                                background: #0ea5e9;
-                                color: white;
-                                width: 30px;
-                                height: 30px;
-                                border-radius: 50%;
-                                text-align: center;
-                                line-height: 30px;
-                                font-weight: bold;
-                                margin-right: 10px;
+                                margin-bottom: 60px;
                             }
                             .story-headline {
-                                font-size: 20px;
-                                font-weight: bold;
+                                font-family: 'Instrument Serif', serif;
+                                font-size: 36px;
+                                font-weight: 400;
+                                line-height: 1.1;
                                 color: #0f172a;
-                                margin-bottom: 10px;
+                                margin: 0 0 20px 0;
+                                letter-spacing: -0.02em;
                             }
                             .story-summary {
-                                font-size: 16px;
-                                color: #334155;
-                                margin-bottom: 15px;
-                                text-align: justify;
+                                font-size: 18px;
+                                color: #475569;
+                                margin-bottom: 30px;
+                                line-height: 1.7;
                             }
                             .perspectives {
-                                background: #f8fafc;
-                                border-left: 4px solid #0ea5e9;
-                                padding: 15px;
-                                margin-top: 10px;
-                            }
-                            .perspectives-title {
-                                font-size: 14px;
-                                font-weight: bold;
-                                color: #64748b;
-                                margin-bottom: 10px;
-                                text-transform: uppercase;
-                                letter-spacing: 0.5px;
+                                display: flex;
+                                flex-wrap: wrap;
+                                gap: 1px;
+                                background-color: #e2e8f0;
+                                border: 1px solid #e2e8f0;
+                                margin-bottom: 20px;
                             }
                             .perspective {
-                                font-size: 14px;
-                                color: #475569;
-                                margin-bottom: 8px;
-                                padding-left: 20px;
-                                position: relative;
+                                flex: 1 1 calc(50% - 1px);
+                                background-color: #ffffff;
+                                padding: 24px;
+                                min-width: 300px;
                             }
-                            .perspective::before {
-                                content: "▸";
-                                position: absolute;
-                                left: 0;
-                                color: #0ea5e9;
-                            }
-                            .source {
+                            .perspective .source {
+                                display: block;
+                                font-family: 'Geist Mono', monospace;
+                                font-size: 12px;
                                 font-weight: bold;
-                                color: #0ea5e9;
+                                text-transform: uppercase;
+                                letter-spacing: 0.1em;
+                                color: #f59e0b;
+                                margin-bottom: 12px;
+                            }
+                            .perspective .angle {
+                                font-size: 16px;
+                                color: #1e293b;
+                                margin: 0;
+                                line-height: 1.6;
+                            }
+                            .sources-list {
+                                font-family: 'Geist Mono', monospace;
+                                font-size: 12px;
+                                text-transform: uppercase;
+                                letter-spacing: 0.1em;
+                                color: #94a3b8;
+                                border-top: 1px solid #e2e8f0;
+                                padding-top: 16px;
+                                margin-top: 24px;
+                            }
+                            .in-brief-section {
+                                margin-top: 60px;
+                            }
+                            .in-brief-title {
+                                font-family: 'Instrument Serif', serif;
+                                font-size: 32px;
+                                font-weight: 400;
+                                color: #0f172a;
+                                border-bottom: 2px solid #0f172a;
+                                padding-bottom: 12px;
+                                margin-bottom: 24px;
                             }
                             .brief-items {
-                                columns: 2;
-                                column-gap: 30px;
+                                display: grid;
+                                grid-template-columns: 1fr 1fr;
+                                gap: 20px 40px;
                             }
                             .brief-item {
-                                font-size: 14px;
-                                color: #475569;
-                                margin-bottom: 10px;
-                                break-inside: avoid;
-                                padding-left: 20px;
-                                position: relative;
+                                display: flex;
+                                align-items: flex-start;
+                                gap: 12px;
                             }
-                            .brief-item::before {
-                                content: "•";
-                                position: absolute;
-                                left: 0;
-                                color: #0ea5e9;
-                                font-weight: bold;
+                            .brief-item .bullet {
+                                width: 6px;
+                                height: 6px;
+                                background-color: #0f172a;
+                                border-radius: 50%;
+                                margin-top: 10px;
+                                flex-shrink: 0;
+                            }
+                            .brief-item .text {
+                                font-size: 16px;
+                                color: #1e293b;
+                                line-height: 1.5;
                             }
                             .footer {
                                 text-align: center;
-                                margin-top: 50px;
-                                padding-top: 20px;
-                                border-top: 2px solid #e2e8f0;
+                                margin-top: 80px;
+                                padding-top: 40px;
+                                border-top: 1px solid #e2e8f0;
+                                font-family: 'Geist Mono', monospace;
                                 font-size: 12px;
+                                text-transform: uppercase;
+                                letter-spacing: 0.1em;
                                 color: #94a3b8;
                             }
                             .footer .logo {
-                                font-size: 18px;
                                 font-weight: bold;
-                                color: #0ea5e9;
-                                margin-bottom: 5px;
+                                color: #0f172a;
+                                margin-bottom: 8px;
                             }
                         </style>
                     </head>
                     <body>
                         <div class="header">
-                            <h1>MY ANCHOR</h1>
-                            <div class="subtitle">Your AI News Analyst</div>
+                            <h1>My Anchor</h1>
                             <div class="date">${today}</div>
                         </div>
                 `;
                 
                 // Top Stories
                 if (analysis.story_groups && analysis.story_groups.length > 0) {
-                    html += '<h2 class="section-title">📰 Top Stories</h2>';
-                    
                     analysis.story_groups.forEach((group, index) => {
                         html += `
                             <div class="story">
-                                <div class="story-headline">
-                                    <span class="story-number">${index + 1}</span>
-                                    ${escapeHtml(group.group_headline)}
-                                </div>
-                                <div class="story-summary">${escapeHtml(group.group_summary)}</div>
+                                <h2 class="story-headline">${escapeHtml(group.group_headline)}</h2>
+                                <div class="story-summary">${escapeHtml(group.consensus_summary || group.group_summary)}</div>
                         `;
                         
                         if (group.stories && group.stories.length > 0) {
                             html += '<div class="perspectives">';
-                            html += '<div class="perspectives-title">Source Perspectives</div>';
                             group.stories.forEach(story => {
-                                const source = story.source.split('<')[0].trim().replace('.com', '');
+                                const source = story.source.split('<')[0].trim().replace(/\.(com|co\.\w+)$/, '') || story.source;
                                 html += `
                                     <div class="perspective">
-                                        <span class="source">${escapeHtml(source)}:</span> ${escapeHtml(story.angle)}
+                                        <span class="source">${escapeHtml(source)}</span>
+                                        <p class="angle">${escapeHtml(story.angle)}</p>
                                     </div>
                                 `;
                             });
                             html += '</div>';
+
+                            const sourcesList = group.stories.map(s => s.source.split('<')[0].trim().replace(/\.(com|co\.\w+)$/, '')).join(', ');
+                            html += `<div class="sources-list">Verified Sources: ${escapeHtml(sourcesList)}</div>`;
                         }
                         
                         html += '</div>';
@@ -1083,12 +1121,18 @@
                 
                 // In Brief
                 if (analysis.remaining_stories && analysis.remaining_stories.length > 0) {
-                    html += '<h2 class="section-title">📌 In Brief</h2>';
+                    html += '<div class="in-brief-section">';
+                    html += '<h3 class="in-brief-title">In Brief</h3>';
                     html += '<div class="brief-items">';
                     analysis.remaining_stories.forEach(story => {
-                        html += `<div class="brief-item">${escapeHtml(story.headline)}</div>`;
+                        html += `
+                            <div class="brief-item">
+                                <div class="bullet"></div>
+                                <div class="text">${escapeHtml(story.headline)}</div>
+                            </div>
+                        `;
                     });
-                    html += '</div>';
+                    html += '</div></div>';
                 }
                 
                 // Footer
@@ -1127,6 +1171,48 @@
                 });
             };
 
+            const togglePlayPause = () => {
+                if (webSpeechActive && window.speechSynthesis) {
+                    if (window.speechSynthesis.paused) {
+                        window.speechSynthesis.resume();
+                        setIsPlaying(true);
+                    } else if (window.speechSynthesis.speaking) {
+                        window.speechSynthesis.pause();
+                        setIsPlaying(false);
+                    }
+                } else if (audioRef.current) {
+                    if (audioRef.current.paused) {
+                        audioRef.current.play();
+                    } else {
+                        audioRef.current.pause();
+                    }
+                }
+            };
+
+            const formatTime = (timeInSeconds) => {
+                if (isNaN(timeInSeconds) || timeInSeconds < 0) return "00:00";
+                const m = Math.floor(timeInSeconds / 60).toString().padStart(2, '0');
+                const s = Math.floor(timeInSeconds % 60).toString().padStart(2, '0');
+                return `${m}:${s}`;
+            };
+
+            const handleSeek = (e) => {
+                if (audioRef.current && audioDuration) {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const percent = Math.max(0, Math.min(1, x / rect.width));
+                    audioRef.current.currentTime = percent * audioDuration;
+                    setAudioProgress(percent * audioDuration);
+                }
+            };
+
+            const handleToggleSpeed = () => {
+                const speeds = [1.0, 1.25, 1.5, 2.0];
+                const currentIndex = speeds.indexOf(playbackRate);
+                const nextSpeed = speeds[(currentIndex + 1) % speeds.length];
+                setPlaybackRate(nextSpeed);
+            };
+
             // Keyboard shortcuts (R=Refresh, P=Play, S=Settings) — not when modal, tour, or typing in fields
             React.useEffect(() => {
                 if (sharedData) return;
@@ -1135,54 +1221,49 @@
                     const tag = (document.activeElement && document.activeElement.tagName) || '';
                     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
                     const k = e.key?.toLowerCase();
-                    if (k === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); handleFetchAndAnalyze(); }
+                    if (e.key === ' ' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+                        if (webSpeechActive || document.querySelector('audio')) {
+                            e.preventDefault();
+                            togglePlayPause();
+                        }
+                    }
+                    else if (k === 'r' && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); handleFetchAndAnalyze(); }
                     else if (k === 'p' && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); if (analysis) handleGenerateAudio(); }
                     else if (k === 's' && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); setIsSettingsOpen(true); }
                 };
                 document.addEventListener('keydown', onKey);
                 return () => document.removeEventListener('keydown', onKey);
-            }, [sharedData, isSettingsOpen, showTour, analysis]);
+            }, [sharedData, isSettingsOpen, showTour, analysis, webSpeechActive]);
 
-            const handleToggleSpeed = () => {
-                const speeds = [1.0, 1.25, 1.5, 2.0];
-                const currentIndex = speeds.indexOf(playbackRate);
-                const nextSpeed = speeds[(currentIndex + 1) % speeds.length];
-                setPlaybackRate(nextSpeed);
-            };
             return (
                 <div className="min-h-screen bg-slate-50 dark:bg-slate-900 pb-40 sm:pb-32">
-                    <nav className="glass sticky top-0 z-40 border-b border-slate-200 dark:border-white/5">
-                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                            <div className="flex justify-between h-16">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-9 h-9 bg-brand-500 rounded-xl flex items-center justify-center shadow-lg shadow-brand-500/20">
-                                        <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 12h6m-1 8h.01" /></svg>
-                                    </div>
-                                    <h1 className="text-xl font-bold text-slate-800 dark:text-white mb-0" style={{ fontSize: '20px' }}>
-                                        {sharedData ? "Shared Briefing" : "My Anchor"}
-                                    </h1>
-                                    <span className="text-xs font-medium text-slate-500 dark:text-gray-400 hidden sm:inline border-l border-slate-200 dark:border-slate-800 pl-3 ml-1" aria-hidden="true">
-                                        {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <button onClick={() => setDarkMode(!darkMode)} className="p-2 text-slate-500 hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" title="Toggle dark mode" aria-label="Toggle dark mode">
-                                        {darkMode ? <Icons.Sun /> : <Icons.Moon />}
-                                    </button>
-                                    {!sharedData && (
-                                        <>
-                                            <button onClick={() => setIsSettingsOpen(true)} className="p-2 flex items-center gap-1.5 text-slate-500 hover:text-brand-500 dark:text-slate-400 dark:hover:text-brand-400 rounded-xl hover:bg-slate-100 dark:hover:bg-white/5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" title="Settings (S)" aria-label="Open settings">
-                                                <Icons.Settings />
-                                                <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-sans font-medium bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded">S</kbd>
-                                            </button>
-                                            <div className="h-6 w-px bg-slate-200 dark:border-white/10 mx-2"></div>
-                                            <a href={`${backendUrl}/logout`} className="text-sm font-semibold text-slate-500 hover:text-brand-500 dark:hover:text-brand-400 px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500">Logout</a>
-                                        </>
-                                    )}
-                                </div>
+                    <a href="#main-content" className="absolute left-4 top-4 z-50 -translate-y-[200%] focus:translate-y-0 px-4 py-2 bg-slate-900 text-white font-medium rounded-lg shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-500 transition-transform">
+                        Skip to main content
+                    </a>
+                    <header className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-16 mb-16 border-b-2 border-slate-900 dark:border-slate-100 pb-8 flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
+                        <h1 className="font-display italic text-5xl sm:text-6xl text-slate-900 dark:text-white font-normal m-0 tracking-tight">
+                            {sharedData ? "Shared Briefing" : "My Anchor"}
+                        </h1>
+                        <div className="flex items-center justify-between sm:justify-end w-full sm:w-auto gap-6">
+                            <span className="font-mono text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold">
+                                {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                            </span>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => setDarkMode(!darkMode)} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Toggle dark mode" aria-label="Toggle dark mode">
+                                    {darkMode ? <Icons.Sun /> : <Icons.Moon />}
+                                </button>
+                                {!sharedData && (
+                                    <>
+                                        <button onClick={() => setIsSettingsOpen(true)} className="p-2 flex items-center gap-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Settings (S)" aria-label="Open settings">
+                                            <Icons.Settings />
+                                        </button>
+                                        <div className="h-4 w-px bg-slate-300 dark:bg-slate-700 mx-1"></div>
+                                        <a href={`${backendUrl}/logout`} className="font-mono text-xs font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white uppercase tracking-widest transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">Logout</a>
+                                    </>
+                                )}
                             </div>
                         </div>
-                    </nav>
+                    </header>
                     
                     {!sharedData && isSettingsOpen && (
                         <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} currentSettings={settings} onSave={handleSaveSettings} />
@@ -1191,51 +1272,48 @@
                         <OnboardingTour onClose={() => setShowTour(false)} />
                     )}
 
-                    <main className="py-8 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto">
+                    <main id="main-content" tabIndex="-1" className="px-4 sm:px-6 max-w-[1200px] mx-auto focus:outline-none">
+                        {isMockSession && <DemoBanner />}
                         {!sharedData && (
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-10 bg-gradient-to-br from-white to-slate-50/50 dark:from-slate-800 dark:to-slate-800/80 p-6 rounded-2xl shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700">
-                                <div>
-                                    <div className="flex items-center gap-3 mb-1">
-                                        <h2 className="text-2xl font-serif font-bold text-slate-900 dark:text-white">
-                                            {(() => {
-                                                const h = new Date().getHours();
-                                                const g = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-                                                const name = userInfo?.given_name || userInfo?.name?.split(' ')[0];
-                                                return name ? `${g}, ${name}` : g;
-                                            })()}
-                                        </h2>
-                                    </div>
-                                    <p className="text-slate-500 dark:text-slate-400 text-sm">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 border-b border-slate-200 dark:border-slate-800 pb-8">
+                                <div className="text-center sm:text-left">
+                                    <h2 className="text-lg font-mono font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">
+                                        {(() => {
+                                            const h = new Date().getHours();
+                                            const g = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+                                            const name = userInfo?.given_name || userInfo?.name?.split(' ')[0];
+                                            return name ? `${g}, ${name}` : g;
+                                        })()}
+                                    </h2>
                                     {analysis && isPreloadingAudio && (
-                                        <p className="text-brand-600 dark:text-brand-400 text-xs font-medium mt-1.5">Preparing audio...</p>
+                                        <p role="status" aria-live="polite" className="text-amber-500 text-xs font-mono uppercase tracking-widest font-bold mt-2">Preparing audio...</p>
                                     )}
                                 </div>
-                                <div className="flex flex-wrap gap-3 justify-center sm:justify-end">
+                                <div className="flex flex-wrap gap-4 justify-center sm:justify-end items-center">
                                     {analysis && (
-                                        <button onClick={handleCopySummary} className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" title="Copy Executive Summary" aria-label={copySuccess ? "Copied to clipboard" : "Copy Executive Summary"}>
+                                        <button onClick={handleCopySummary} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Copy Executive Summary" aria-label="Copy Executive Summary">
                                             {copySuccess ? <Icons.Check /> : <Icons.Copy />}
-                                            {copySuccess && <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs py-1 px-2 rounded opacity-100 transition-opacity whitespace-nowrap">Copied!</span>}
+                                            {copySuccess && <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-mono text-xs py-1 px-2 rounded opacity-100 uppercase tracking-wider">Copied</span>}
                                         </button>
                                     )}
                                     {analysis && (
-                                        <button onClick={handleDownloadPDF} className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" title="Download as PDF" aria-label="Download as PDF">
+                                        <button onClick={handleDownloadPDF} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Download as PDF" aria-label="Download as PDF">
                                             <Icons.Download />
                                         </button>
                                     )}
                                     {analysis && (
-                                        <button onClick={handleShare} disabled={isSharing} className="p-3 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-500 hover:text-brand-600 dark:text-slate-400 dark:hover:text-white rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 transition-all relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed" title="Share Briefing Link" aria-label={shareUrl ? "Link copied to clipboard" : isSharing ? "Sharing..." : "Share Briefing Link"}>
+                                        <button onClick={handleShare} disabled={isSharing} className="p-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title={isSharing ? "Sharing..." : "Share Briefing Link"} aria-label={isSharing ? "Sharing..." : "Share Briefing Link"}>
                                             {isSharing ? <span className="inline-block animate-spin"><Icons.Refresh /></span> : shareUrl ? <Icons.Check /> : <Icons.Share />}
                                         </button>
                                     )}
-                                    <button onClick={handleFetchAndAnalyze} disabled={isFetching || isGeneratingAudio} className="flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-white font-medium rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm" title="Refresh briefing (R)" aria-label={isFetching ? "Scanning inbox" : "Refresh briefing"}>
+                                    <button onClick={handleFetchAndAnalyze} disabled={isFetching || isGeneratingAudio} className="font-mono text-xs uppercase tracking-widest font-bold flex items-center gap-2 px-4 py-2 border-2 border-slate-900 dark:border-white text-slate-900 dark:text-white hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Refresh briefing (R)">
                                         {isFetching ? <span className="inline-block animate-spin"><Icons.Refresh /></span> : <Icons.Refresh />}
-                                        {isFetching ? 'Scanning...' : 'Refresh'}
-                                        {!isFetching && <kbd className="hidden sm:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-sans font-medium bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600 rounded">R</kbd>}
+                                        {isFetching ? 'Scanning' : 'Refresh'}
                                     </button>
                                     {analysis && (
-                                        <button onClick={handleGenerateAudio} disabled={isGeneratingAudio || isFetching} className="flex items-center gap-2 px-6 py-3 bg-brand-500 text-white font-bold rounded-xl hover:bg-brand-600 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-lg shadow-brand-500/30 transition-all transform" title="Play briefing audio (P)" aria-label={isPreloadingAudio ? "Preparing audio" : isGeneratingAudio ? "Synthesizing audio" : "Play briefing audio"}>
+                                        <button onClick={handleGenerateAudio} disabled={isGeneratingAudio || isFetching} className="font-mono text-xs uppercase tracking-widest font-bold flex items-center gap-2 px-4 py-2 bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Play briefing audio (P)">
                                             {(isPreloadingAudio || isGeneratingAudio) ? <span className="inline-block animate-spin"><Icons.Refresh /></span> : <Icons.Play />}
-                                            {isPreloadingAudio ? 'Preparing audio...' : isGeneratingAudio ? 'Synthesizing...' : <>Play Briefing <kbd className="hidden sm:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-sans font-medium bg-brand-600/50 text-white border border-brand-400/30 rounded">P</kbd></>}
+                                            {isPreloadingAudio ? 'Preparing' : isGeneratingAudio ? 'Synthesizing' : 'Play Audio'}
                                         </button>
                                     )}
                                 </div>
@@ -1243,14 +1321,10 @@
                         )}
 
                         {error && (
-                            <div role="alert" aria-live="assertive" className="mb-8 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl text-red-600 dark:text-red-400 flex flex-wrap items-center justify-between gap-3">
-                                <p className="flex-1 min-w-0">{error}</p>
-                                <div className="flex items-center gap-2 shrink-0">
-                                    <button onClick={() => { setError(null); handleFetchAndAnalyze(); }} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500" aria-label="Retry">Retry</button>
-                                    <button onClick={() => { try { navigator.clipboard.writeText(error).then(() => { setCopyErrorSuccess(true); setTimeout(() => setCopyErrorSuccess(false), 3000); }); } catch (e) {} }} className="p-2 relative text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" title="Copy error" aria-label="Copy error to clipboard">
-                                        {copyErrorSuccess ? <Icons.Check /> : <Icons.Copy />}
-                                        {copyErrorSuccess && <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-xs py-1 px-2 rounded opacity-100 transition-opacity whitespace-nowrap">Copied!</span>}
-                                    </button>
+                            <div role="alert" aria-live="assertive" className="mb-12 p-6 border-l-4 border-rose-500 bg-rose-50 dark:bg-rose-950/20 text-slate-900 dark:text-slate-100 flex flex-wrap items-center justify-between gap-4 font-body">
+                                <p className="flex-1 min-w-0 text-lg">{error}</p>
+                                <div className="flex items-center gap-3 shrink-0">
+                                    <button onClick={() => { setError(null); handleFetchAndAnalyze(); }} className="font-mono text-xs uppercase tracking-widest font-bold px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white transition-colors" aria-label="Retry">Retry</button>
                                 </div>
                             </div>
                         )}
@@ -1258,63 +1332,58 @@
                         {isFetching ? (
                             <BriefingSkeleton stage={fetchStage} />
                         ) : analysis ? (
-                            <div className="space-y-8">
-                                <div className="grid gap-8">
+                            <div className="space-y-24">
+                                <div>
                                     {analysis.story_groups && analysis.story_groups.map((group, index) => (
-                                        <div key={index} className="premium-card rounded-2xl shadow-sm overflow-hidden hover:shadow-xl hover:-translate-y-1 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" style={{ animation: 'fadeIn 0.4s ease-out both', animationDelay: `${index * 80}ms` }}>
-                                            <div className="p-6 md:p-8">
-                                                <div className="flex items-start justify-between mb-4">
-                                                    <span className={`px-3 py-1 text-xs font-bold uppercase tracking-wider rounded-full ${
-                                                    (settings.personality || 'anchor') === 'analyst' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300' :
-                                                    (settings.personality || 'anchor') === 'dj' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300' :
-                                                    'bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300'
-                                                }`}>Top Story</span>
+                                        <section key={index} className="story-group mb-24" style={{ animation: 'fadeIn 0.6s ease-out both', animationDelay: `${index * 150}ms` }}>
+                                            <h2 className="font-display text-[2.5rem] sm:text-[3.5rem] leading-[1.1] tracking-tight mb-6 text-slate-900 dark:text-white">{group.group_headline}</h2>
+                                            <p className="font-body text-xl sm:text-2xl text-slate-600 dark:text-slate-300 max-w-[1000px] mb-12 leading-relaxed">{group.consensus_summary || group.group_summary}</p>
+
+                                            {group.stories && group.stories.length > 0 && (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-slate-200 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 mb-8 shadow-sm perspective-split">
+                                                    {group.stories.map((story, i) => {
+                                                        const source = story.source.split('<')[0].trim().replace(/\.(com|co\.\w+)$/, '') || story.source;
+                                                        return (
+                                                            <div key={i} className="bg-white dark:bg-slate-900 p-8 split-pane">
+                                                                <span className="font-mono text-xs font-bold uppercase tracking-widest text-amber-500 mb-4 block split-label">
+                                                                    {source}
+                                                                </span>
+                                                                <p className="font-body text-lg text-slate-800 dark:text-slate-200 m-0 split-content leading-relaxed">
+                                                                    {story.angle}
+                                                                </p>
+                                                            </div>
+                                                        )
+                                                    })}
                                                 </div>
-                                                <h3 className="text-2xl md:text-3xl font-serif font-bold text-slate-900 dark:text-white mb-4 leading-tight">{group.group_headline}</h3>
-                                                <p className="text-slate-600 dark:text-slate-300 text-lg leading-relaxed mb-8">{group.group_summary}</p>
-                                                {group.stories && group.stories.length > 0 && (
-                                                    <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-5 border border-slate-100 dark:border-slate-800">
-                                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">Source Perspectives</h4>
-                                                        <div className="space-y-4">
-                                                            {group.stories.map((story, i) => (
-                                                                <div key={i} className="flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-4">
-                                                                    <span className="shrink-0 text-sm font-bold text-blue-700 dark:text-blue-300 px-2 py-1.5 bg-blue-50 dark:bg-blue-900/30 rounded-full border border-blue-100 dark:border-blue-800 shadow-sm max-w-[180px] sm:max-w-none truncate inline-flex items-center gap-1.5">
-                                                                        {getSourceDomain(story.source) && (
-                                                                            <img src={`https://www.google.com/s2/favicons?domain=${getSourceDomain(story.source)}&sz=32`} alt="" className="w-4 h-4 shrink-0 rounded-sm" />
-                                                                        )}
-                                                                        {story.source.split('<')[0].trim().replace(/\.(com|co\.\w+)$/, '') || story.source}
-                                                                    </span>
-                                                                    <p className="text-slate-600 dark:text-slate-400 italic text-sm leading-relaxed border-l-2 border-indigo-200 dark:border-indigo-800 pl-3">"{story.angle}"</p>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
+                                            )}
+
+                                            {group.stories && group.stories.length > 0 && (
+                                                <footer className="font-mono text-xs uppercase tracking-widest text-slate-400 dark:text-slate-500 border-t border-slate-200 dark:border-slate-800 pt-4 source-links">
+                                                    Verified Sources: {group.stories.map(s => s.source.split('<')[0].trim().replace(/\.(com|co\.\w+)$/, '')).join(', ')}
+                                                </footer>
+                                            )}
+                                        </section>
                                     ))}
                                 </div>
+
                                 {analysis.remaining_stories && analysis.remaining_stories.length > 0 && (
-                                    <div className="premium-card rounded-2xl shadow-sm p-6 md:p-8 hover:shadow-lg transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" style={{ animation: 'fadeIn 0.4s ease-out both', animationDelay: `${(analysis.story_groups?.length || 0) * 80}ms` }}>
-                                        <h3 className="text-2xl font-serif font-bold text-slate-900 dark:text-white mb-6 border-b border-slate-100 dark:border-slate-700 pb-4">In Brief</h3>
-                                        <div className="grid sm:grid-cols-2 gap-6">
+                                    <section className="mb-24" style={{ animation: 'fadeIn 0.6s ease-out both', animationDelay: `${(analysis.story_groups?.length || 0) * 150}ms` }}>
+                                        <h3 className="font-display text-4xl text-slate-900 dark:text-white mb-8 border-b-2 border-slate-900 dark:border-slate-100 pb-4">In Brief</h3>
+                                        <div className="grid sm:grid-cols-2 gap-x-12 gap-y-6">
                                             {analysis.remaining_stories.map((story, i) => (
-                                                <div key={i} className="flex gap-3 items-start">
-                                                    <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-brand-500 shrink-0"></span>
-                                                    <p className="text-slate-700 dark:text-slate-300 leading-snug">{story.headline}</p>
+                                                <div key={i} className="flex gap-4 items-start">
+                                                    <span className="mt-2 w-1.5 h-1.5 rounded-full bg-slate-900 dark:bg-slate-100 shrink-0"></span>
+                                                    <p className="font-body text-lg text-slate-800 dark:text-slate-200 leading-snug">{story.headline}</p>
                                                 </div>
                                             ))}
                                         </div>
-                                    </div>
+                                    </section>
                                 )}
                             </div>
                         ) : (
-                            <div className="text-center py-20">
-                                <div className="w-24 h-24 bg-slate-100 dark:bg-slate-800 rounded-full mx-auto flex items-center justify-center mb-6">
-                                    <svg className="w-10 h-10 text-slate-300 dark:text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 12h6m-1 8h.01" /></svg>
-                                </div>
-                                <p className="text-slate-500 dark:text-slate-400 mb-8">Ready to fetch your daily briefing.</p>
-                                <button onClick={handleFetchAndAnalyze} disabled={isFetching} className="flex items-center gap-2 px-8 py-4 bg-brand-500 text-white font-bold rounded-xl hover:bg-brand-600 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed shadow-lg shadow-brand-500/30 transition-all transform mx-auto" aria-label={isFetching ? "Scanning inbox" : "Get my briefing"}>
+                            <div className="text-center py-16 max-w-md mx-auto">
+                                <p className="font-display italic text-3xl text-slate-500 dark:text-slate-400 mb-8">Ready to fetch your daily briefing.</p>
+                                <button onClick={handleFetchAndAnalyze} disabled={isFetching} className="font-mono text-xs uppercase tracking-widest font-bold flex items-center justify-center gap-3 px-8 py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 w-full hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">
                                     {isFetching ? <span className="inline-block animate-spin"><Icons.Refresh /></span> : <Icons.Refresh />}
                                     {isFetching ? 'Scanning...' : 'Get my briefing'}
                                 </button>
@@ -1328,25 +1397,50 @@
                             Link copied to clipboard!
                         </div>
                     )}
-                    {audioSrc && !sharedData && (
-                        <div id="audio-player-bar" className="fixed bottom-6 left-6 right-6 glass dark:bg-[#171717cc] border border-slate-200 dark:border-white/10 p-4 sm:p-5 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] z-50 animate-[slideUp_0.3s_ease-out]">
-                            <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
-                                <div className="flex items-center gap-3 sm:gap-4 shrink-0">
-                                    <div className="w-12 h-12 bg-brand-500 rounded-xl flex items-center justify-center shrink-0 shadow-lg shadow-brand-500/30">
-                                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                                    </div>
-                                    <div className="min-w-0">
-                                        <p className="text-[10px] font-bold text-brand-500 dark:text-brand-400 uppercase tracking-[0.1em]">Now Playing</p>
-                                        <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">Your Daily AI Briefing</p>
+                    {(audioSrc || webSpeechActive) && !sharedData && (
+                        <div id="audio-player-bar" role="region" aria-label="Audio Player" className="fixed bottom-0 left-0 right-0 bg-slate-900 dark:bg-slate-950 p-4 sm:p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] z-50 animate-[slideUp_0.3s_ease-out]">
+                            <div className="max-w-[1200px] mx-auto flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+                                <div className="flex items-center gap-4">
+                                    <button onClick={togglePlayPause} className="w-14 h-14 bg-amber-500 text-white rounded-full flex items-center justify-center shrink-0 hover:scale-105 active:scale-95 transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-500 shadow-md" title={isPlaying ? "Pause" : "Play"} aria-label={isPlaying ? "Pause" : "Play"}>
+                                        {isPlaying ? <Icons.Pause /> : <Icons.Play />}
+                                    </button>
+                                    {webSpeechActive && (
+                                        <div className="font-mono text-xs text-amber-500 uppercase tracking-widest shrink-0 font-bold sm:hidden">
+                                            Live Synthesis
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex-1 min-w-0 flex flex-col justify-center gap-2">
+                                    {audioSrc ? (
+                                        <div className="flex items-center gap-4 w-full">
+                                            <span className="font-mono text-xs text-slate-400 w-10 text-right shrink-0">{formatTime(audioProgress)}</span>
+                                            <div className="flex-1 h-3 bg-slate-700 rounded-full cursor-pointer relative overflow-hidden group" onClick={handleSeek} role="slider" aria-label="Audio progress" aria-valuemin="0" aria-valuemax={audioDuration} aria-valuenow={audioProgress} tabIndex="0">
+                                                <div className="absolute top-0 left-0 bottom-0 bg-amber-500 group-hover:bg-amber-400 transition-colors" style={{ width: `${audioDuration > 0 ? (audioProgress / audioDuration) * 100 : 0}%` }}></div>
+                                            </div>
+                                            <span className="font-mono text-xs text-slate-400 w-10 shrink-0">{formatTime(audioDuration)}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-4 w-full h-3">
+                                            <div className="waveform flex-1 opacity-80 animate-pulse"></div>
+                                        </div>
+                                    )}
+                                    <div className="flex-1 min-w-0 absolute opacity-0 pointer-events-none">
+                                        {audioSrc && <audio ref={audioRef} autoPlay src={audioSrc} onTimeUpdate={(e) => setAudioProgress(e.target.currentTime)} onLoadedMetadata={(e) => setAudioDuration(e.target.duration)} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={() => setIsPlaying(false)} className="w-full" />}
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-                                    <button onClick={handleToggleSpeed} className="h-10 px-3 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-white/5 rounded-xl hover:bg-slate-200 dark:hover:bg-white/10 active:scale-95 transition-all shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500" title="Playback speed" aria-label={`Playback speed ${playbackRate}x`}>
-                                        {playbackRate.toFixed(2)}x
+                                <div className="flex items-center justify-end gap-2 shrink-0">
+                                    <button onClick={handleToggleSpeed} className="h-10 px-3 font-mono text-xs font-bold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Playback speed" aria-label={`Playback speed: ${playbackRate}x`}>
+                                        {playbackRate}x
                                     </button>
-                                    <div className="flex-1 min-w-0">
-                                        <audio ref={audioRef} controls autoPlay src={audioSrc} className="w-full h-10 accent-brand-500" />
-                                    </div>
+                                    {audioSrc && (
+                                        <a href={audioSrc} download={`MyAnchor_Briefing_${new Date().toISOString().split('T')[0]}.mp3`} className="h-10 w-10 flex items-center justify-center text-slate-300 hover:text-white rounded-full hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500" title="Download Audio" aria-label="Download Audio">
+                                            <Icons.Download />
+                                        </a>
+                                    )}
+                                    <div className="w-px h-6 bg-slate-700 mx-1"></div>
+                                    <button onClick={() => { setAudioSrc(null); setWebSpeechActive(false); if ('speechSynthesis' in window) window.speechSynthesis.cancel(); setIsPlaying(false); }} className="h-10 w-10 flex items-center justify-center text-slate-400 hover:text-white rounded-full hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 shrink-0" aria-label="Close audio player" title="Close">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -1392,7 +1486,7 @@
                                 <p className="text-slate-500 dark:text-slate-400 mb-6">We've been notified and are looking into it.</p>
                                 <button 
                                     onClick={() => window.location.reload()} 
-                                    className="px-6 py-3 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                                    className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                                 >
                                     Reload Page
                                 </button>
@@ -1408,31 +1502,27 @@
         const App = () => {
             const [isLoading, setIsLoading] = React.useState(true);
             const [isLoggedIn, setIsLoggedIn] = React.useState(false);
+            const [isMockSession, setIsMockSession] = React.useState(false);
             const [userInfo, setUserInfo] = React.useState(null);
             const [sharedData, setSharedData] = React.useState(null);
 
             React.useEffect(() => {
-                // Check for shared briefing in URL
                 const urlParams = new URLSearchParams(window.location.search);
                 const shareId = urlParams.get('share');
                 
                 if (shareId) {
-                    // Load shared briefing
                     fetch(`${backendUrl}/api/shared/${shareId}`)
                         .then(res => res.json())
-                        .then(data => {
-                            setSharedData(data);
-                            setIsLoading(false);
-                        })
+                        .then(data => { setSharedData(data); setIsLoading(false); })
                         .catch(() => setIsLoading(false));
                 } else {
-                    // Check authentication
                     fetch(`${backendUrl}/api/check_auth`, { credentials: 'include' })
                         .then(res => res.json())
                         .then(data => {
                             if (data.logged_in) {
                                 setIsLoggedIn(true);
                                 setUserInfo(data.user);
+                                setIsMockSession(!!data.is_mock_session);
                             }
                             setIsLoading(false);
                         })
@@ -1440,18 +1530,16 @@
                 }
             }, []);
 
-            if (isLoading) {
-                return <LoadingState text="Loading..." />;
-            }
+            if (isLoading) return <LoadingState text="Loading..." />;
 
             const mainContent = sharedData ? (
-                <Dashboard userInfo={null} sharedData={sharedData} />
+                <Dashboard userInfo={null} sharedData={sharedData} isMockSession={false} />
             ) : new URLSearchParams(window.location.search).get('logout') === 'true' ? (
                 <LogoutPage />
             ) : !isLoggedIn ? (
                 <LoginPage />
             ) : (
-                <Dashboard userInfo={userInfo} sharedData={null} />
+                <Dashboard userInfo={userInfo} sharedData={null} isMockSession={isMockSession} />
             );
 
             return <div className="animate-[fadeIn_0.45s_ease-out]">{mainContent}</div>;
