@@ -449,17 +449,22 @@ else:
         print("CRITICAL: GOOGLE_API_KEY is missing from environment variables!")
     model = None
 
+_RE_CONTROL_CHARS = re.compile(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]')
+_RE_SCRIPT_STYLE = re.compile(r'<(script|style).*?>.*?</\1>', flags=re.IGNORECASE | re.DOTALL)
+_RE_HTML_TAGS = re.compile(r'<[^>]+>')
+_RE_JSON_MATCH = re.compile(r'\{.*\}', flags=re.DOTALL)
+
 def sanitize_for_llm(text):
-    text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
+    text = _RE_CONTROL_CHARS.sub('', text)
     return text.replace('\\', '\\\\').replace('"', '\\"')
 
 def optimize_newsletter_for_llm(html_content: str, max_chars: int = 15000) -> str:
     """Strips HTML tags and extra whitespace to massively reduce LLM token usage."""
     # ⚡ Bolt: Regex is >50x faster than BeautifulSoup for this and handles <script>/<style> removal correctly.
     # Remove script and style tags and their contents
-    no_scripts = re.sub(r'<(script|style).*?>.*?</\1>', '', html_content, flags=re.IGNORECASE | re.DOTALL)
+    no_scripts = _RE_SCRIPT_STYLE.sub('', html_content)
     # Remove all other HTML tags
-    text_only = re.sub(r'<[^>]+>', ' ', no_scripts)
+    text_only = _RE_HTML_TAGS.sub(' ', no_scripts)
     # Remove extra whitespace (newline, tabs)
     clean_text = ' '.join(text_only.split())
     # Truncate to save tokens if it's too long
@@ -545,7 +550,7 @@ def _process_llm_response(response):
     text = getattr(response, 'text', None)
     if not text:
         return {"error": "AI analysis failed."}
-    match = re.search(r'\{.*\}', text, re.DOTALL)
+    match = _RE_JSON_MATCH.search(text)
     if match: return json.loads(match.group(0))
     else: raise ValueError("No valid JSON found.")
 
@@ -638,7 +643,7 @@ def _fetch_one_message(args):
             body_data = msg['payload'].get('body', {}).get('data', '')
         if not body_data:
             return (index, None, None)
-        decoded_data = base64.urlsafe_b64decode(body_data.encode('ASCII'))
+        decoded_data = base64.urlsafe_b64decode(body_data)
         html_str = decoded_data.decode('utf-8', errors='ignore')
         optimized_text = optimize_newsletter_for_llm(html_str, max_chars=15000)
         sanitized_text = sanitize_for_llm(optimized_text)
