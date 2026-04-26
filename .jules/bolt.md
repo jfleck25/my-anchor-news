@@ -31,3 +31,7 @@
 ## 2026-04-24 - Add React.memo() to prevent unnecessary re-renders during high-frequency state updates
 **Learning:** In React components where a parent manages a high-frequency updating state (such as audio playback progress that updates multiple times per second), rendering heavy child DOM elements directly inside the parent causes unnecessary continuous reconciliation and layout thrashing, severely degrading UI performance.
 **Action:** Extract large or complex static/semi-static child element structures (like mapped arrays of data cards) into separate components wrapped in `React.memo()`. This ensures the heavy child components only re-render when their specific props change, rather than on every tick of the parent's independent high-frequency state update.
+
+## $(date +%Y-%m-%d) - Optimize multiple dictionary lookups in lists
+**Learning:** When searching a list of dictionaries (like email headers) for multiple specific items using multiple generator expressions (e.g., `next((h['value'] for h in headers if ...))`), Python iterates the list multiple times. If string manipulation like `.lower()` is inside the generator, it's executed `O(M * N)` times, heavily degrading performance in tight loops (like inside `ThreadPoolExecutor`).
+**Action:** Replace multiple generator lookups with a single `for` loop over the list. Apply string manipulations once per item, extract all needed values, and use an early `break` when all conditions are met to achieve true `O(N)` performance.
