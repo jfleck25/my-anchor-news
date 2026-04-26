@@ -31,7 +31,10 @@
 ## 2026-04-24 - Add React.memo() to prevent unnecessary re-renders during high-frequency state updates
 **Learning:** In React components where a parent manages a high-frequency updating state (such as audio playback progress that updates multiple times per second), rendering heavy child DOM elements directly inside the parent causes unnecessary continuous reconciliation and layout thrashing, severely degrading UI performance.
 **Action:** Extract large or complex static/semi-static child element structures (like mapped arrays of data cards) into separate components wrapped in `React.memo()`. This ensures the heavy child components only re-render when their specific props change, rather than on every tick of the parent's independent high-frequency state update.
+## $(date +%Y-%m-%d) - Pre-compile Regexes at Module Level
+**Learning:** Python's `re` module internally caches recent expressions, but defining them as module-level constants avoids the dictionary lookup overhead of the internal cache on every function call. This is particularly useful in functions like `sanitize_for_llm` and `optimize_newsletter_for_llm` that are likely called iteratively over many messages.
+**Action:** Pre-compile frequently used regular expressions using `re.compile()` at the module level rather than invoking `re.sub()` or `re.search()` with raw strings dynamically inside frequently called functions.
 
-## $(date +%Y-%m-%d) - Optimize multiple dictionary lookups in lists
-**Learning:** When searching a list of dictionaries (like email headers) for multiple specific items using multiple generator expressions (e.g., `next((h['value'] for h in headers if ...))`), Python iterates the list multiple times. If string manipulation like `.lower()` is inside the generator, it's executed `O(M * N)` times, heavily degrading performance in tight loops (like inside `ThreadPoolExecutor`).
-**Action:** Replace multiple generator lookups with a single `for` loop over the list. Apply string manipulations once per item, extract all needed values, and use an early `break` when all conditions are met to achieve true `O(N)` performance.
+## $(date +%Y-%m-%d) - Remove unnecessary string encoding for base64 decoding
+**Learning:** Python 3's `base64.urlsafe_b64decode()` natively accepts strings. Adding `.encode('ASCII')` before decoding introduces an unnecessary explicit Python-level method call and a potential string copy memory allocation overhead.
+**Action:** When using `base64.urlsafe_b64decode()` on string variables, pass the string directly without manually encoding it to bytes first.
