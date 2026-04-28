@@ -176,6 +176,7 @@
             const [personality, setPersonality] = React.useState(currentSettings.personality || 'anchor');
             const [newSource, setNewSource] = React.useState("");
             const [newKeyword, setNewKeyword] = React.useState("");
+            const [isSaving, setIsSaving] = React.useState(false);
 
             // --- Source Management ---
             const handleAddSource = () => {
@@ -214,7 +215,7 @@
                 }
             };
 
-            const handleSave = () => {
+            const handleSave = async () => {
                 let finalSources = [...sources];
                 if (newSource && !finalSources.includes(newSource)) {
                     finalSources.push(newSource);
@@ -229,14 +230,19 @@
                     setNewKeyword("");
                 }
 
-                onSave({ 
-                    sources: finalSources,
-                    priority_sources: prioritySources,
-                    keywords: finalKeywords,
-                    time_window_hours: parseInt(timeWindow),
-                    personality
-                });
-                onClose();
+                setIsSaving(true);
+                try {
+                    await onSave({
+                        sources: finalSources,
+                        priority_sources: prioritySources,
+                        keywords: finalKeywords,
+                        time_window_hours: parseInt(timeWindow),
+                        personality
+                    });
+                } finally {
+                    setIsSaving(false);
+                    onClose();
+                }
             };
 
             const modalRef = React.useRef(null);
@@ -380,8 +386,11 @@
                         </div>
 
                         <div className="px-6 py-4 bg-white dark:bg-slate-900 border-t-2 border-slate-900 dark:border-slate-100 flex justify-end gap-3 shrink-0">
-                            <button onClick={onClose} className="px-4 py-2 font-mono text-xs uppercase tracking-widest font-bold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">Cancel</button>
-                            <button onClick={handleSave} className="font-mono text-xs uppercase tracking-widest font-bold flex items-center gap-2 px-4 py-2 border-2 border-slate-900 dark:border-white text-slate-900 dark:text-white hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500">Save Changes</button>
+                            <button onClick={onClose} disabled={isSaving} className="px-4 py-2 font-mono text-xs uppercase tracking-widest font-bold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed">Cancel</button>
+                            <button onClick={handleSave} disabled={isSaving} className="font-mono text-xs uppercase tracking-widest font-bold flex items-center gap-2 px-4 py-2 border-2 border-slate-900 dark:border-white text-slate-900 dark:text-white hover:bg-slate-900 hover:text-white dark:hover:bg-white dark:hover:text-slate-900 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                                {isSaving ? <span className="inline-block animate-spin"><Icons.Refresh /></span> : null}
+                                {isSaving ? 'Saving...' : 'Save Changes'}
+                            </button>
                         </div>
                     </div>
                 </div>
