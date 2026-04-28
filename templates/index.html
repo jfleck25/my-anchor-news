@@ -634,6 +634,19 @@
                 }
             }, [audioSrc, playbackRate]);
 
+            // ⚡ Bolt: Explicitly trigger play() when audioSrc changes to help with autoplay hurdles
+            React.useEffect(() => {
+                if (audioSrc && audioRef.current) {
+                    const playPromise = audioRef.current.play();
+                    if (playPromise !== undefined) {
+                        playPromise.catch(error => {
+                            console.warn("Autoplay blocked or interrupted:", error);
+                            setIsPlaying(false);
+                        });
+                    }
+                }
+            }, [audioSrc]);
+
             React.useEffect(() => {
                 if (!sharedData) { 
                     const fetchSettings = async () => {
@@ -1431,7 +1444,24 @@
                                         </div>
                                     )}
                                     <div className="flex-1 min-w-0 absolute opacity-0 pointer-events-none">
-                                        {audioSrc && <audio ref={audioRef} autoPlay src={audioSrc} onTimeUpdate={(e) => setAudioProgress(e.target.currentTime)} onLoadedMetadata={(e) => setAudioDuration(e.target.duration)} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={() => setIsPlaying(false)} className="w-full" />}
+                                        {audioSrc && (
+                                            <audio 
+                                                ref={audioRef} 
+                                                autoPlay 
+                                                src={audioSrc} 
+                                                onTimeUpdate={(e) => setAudioProgress(e.target.currentTime)} 
+                                                onLoadedMetadata={(e) => setAudioDuration(e.target.duration)} 
+                                                onPlay={() => setIsPlaying(true)} 
+                                                onPause={() => setIsPlaying(false)} 
+                                                onEnded={() => setIsPlaying(false)} 
+                                                onError={(e) => {
+                                                    console.error("Audio element error:", e.target.error);
+                                                    setError(`Audio playback error: ${e.target.error?.message || "Source blocked or invalid format"}`);
+                                                    setIsPlaying(false);
+                                                }}
+                                                className="w-full" 
+                                            />
+                                        )}
                                     </div>
                                 </div>
                                 <div className="flex items-center justify-end gap-2 shrink-0">

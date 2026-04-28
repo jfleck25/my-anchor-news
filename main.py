@@ -68,8 +68,8 @@ if MOCK_MODE:
 app = flask.Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
-# 🛡️ Sentinel: Enforce a global 2MB request payload limit to prevent resource exhaustion / DoS
-app.config['MAX_CONTENT_LENGTH'] = 2 * 1024 * 1024
+# 🛡️ Sentinel: Enforce a global 10MB request payload limit to handle large briefings/audio data
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
 
 allowed_origins = os.environ.get("ALLOWED_ORIGINS")
 if allowed_origins:
@@ -102,7 +102,7 @@ def add_security_headers(response):
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'SAMEORIGIN'
     response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://browser.sentry-cdn.com https://unpkg.com https://us.i.posthog.com https://eu.i.posthog.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://us.i.posthog.com https://eu.i.posthog.com https://sentry.io https://*.sentry.io;"
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://browser.sentry-cdn.com https://unpkg.com https://us.i.posthog.com https://eu.i.posthog.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; media-src 'self' data:; connect-src 'self' https://us.i.posthog.com https://eu.i.posthog.com https://sentry.io https://*.sentry.io;"
     return response
 
 # Enable detailed error messages in development
@@ -705,6 +705,7 @@ def _synthesize_audio_from_chunks(chunks, creds_dict, style, project_id):
         results = list(executor.map(_synthesize_one_chunk, worker_args))
     all_audio_content = b"".join(audio for _idx, audio in results)
     tts_duration_ms = int((time.time() - t_start) * 1000)
+    print(f" * [TTS] Synthesized {len(chunks)} chunks in {tts_duration_ms}ms. Total size: {len(all_audio_content)} bytes")
     return all_audio_content, tts_duration_ms
 
 def _synthesize_one_chunk(args):
@@ -1183,6 +1184,10 @@ def generate_audio():
 
         chunks = _chunk_script_text(script_text)
         all_audio_content, tts_duration_ms = _synthesize_audio_from_chunks(chunks, creds_dict, style, PROJECT_ID)
+
+        if not all_audio_content or len(all_audio_content) < 100:
+            print(f"ERROR: Generated audio is too small ({len(all_audio_content) if all_audio_content else 0} bytes)")
+            return jsonify({'error': 'The generated audio was empty or invalid. Please try a different persona or refresh.'}), 500
 
         audio_base64 = base64.b64encode(all_audio_content).decode('utf-8')
         
