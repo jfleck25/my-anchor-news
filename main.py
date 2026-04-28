@@ -244,8 +244,10 @@ init_db()
 def anonymize_user(email):
     if not email:
         return 'anonymous'
-    # Use app instance secret_key for a consistent but secure salt across sessions if it persists, or fallback to something secure
-    salt = str(app.secret_key or "default_salt")
+    # 🛡️ Sentinel: Enforce presence of a secure cryptographic salt
+    if not app.secret_key:
+        raise RuntimeError("CRITICAL: app.secret_key is required for secure user anonymization.")
+    salt = str(app.secret_key)
     return hashlib.sha256((email + salt).encode()).hexdigest()
 
 

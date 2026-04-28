@@ -75,5 +75,18 @@ class TestAnonymizeUser(unittest.TestCase):
 
         self.assertEqual(result1, result2)
 
+
+    def test_anonymize_user_missing_secret_key(self):
+        """Test anonymize_user raises RuntimeError when secret_key is missing"""
+        email = "test@example.com"
+        main.app = MagicMock()
+        main.app.secret_key = None
+
+        with self.assertRaises(RuntimeError) as context:
+            main.anonymize_user(email)
+
+        self.assertTrue("app.secret_key is required" in str(context.exception))
+
 if __name__ == '__main__':
+
     unittest.main()

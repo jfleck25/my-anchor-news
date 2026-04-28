@@ -66,3 +66,7 @@
 **Vulnerability:** Setting `OAUTHLIB_INSECURE_TRANSPORT="1"` globally based solely on `FLASK_ENV != 'production'` risks unintentionally enabling insecure OAuth transport in intermediate environments (like staging or CI/CD test suites).
 **Learning:** Security-degrading developer conveniences must be strictly opt-in using explicitly named feature flags, rather than relying on broad environment negations.
 **Prevention:** Require specific override environment variables (e.g., `ALLOW_INSECURE_OAUTH=1`) for local development conveniences that weaken security, and explicitly unset dangerous flags if the override is not provided.
+## 2024-04-28 - Missing Cryptographic Salt Fallback in Anonymization
+**Vulnerability:** The `anonymize_user` function fell back to a hardcoded string ("default_salt") if `app.secret_key` was not set, resulting in predictable hashes.
+**Learning:** Fallbacks for security-sensitive keys (like cryptographic salts) should be treated as fatal errors rather than gracefully handled with insecure defaults.
+**Prevention:** Explicitly assert the presence of cryptographic keys and fail fast (e.g., raise a RuntimeError) to prevent the application from silently running in an insecure state.
