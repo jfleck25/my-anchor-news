@@ -66,3 +66,8 @@
 **Vulnerability:** Setting `OAUTHLIB_INSECURE_TRANSPORT="1"` globally based solely on `FLASK_ENV != 'production'` risks unintentionally enabling insecure OAuth transport in intermediate environments (like staging or CI/CD test suites).
 **Learning:** Security-degrading developer conveniences must be strictly opt-in using explicitly named feature flags, rather than relying on broad environment negations.
 **Prevention:** Require specific override environment variables (e.g., `ALLOW_INSECURE_OAUTH=1`) for local development conveniences that weaken security, and explicitly unset dangerous flags if the override is not provided.
+
+## 2024-05-14 - Unused Sanitization Resulting in Mass Assignment
+**Vulnerability:** The `/api/share` endpoint properly validated input by constructing a `sanitized_data` dictionary to filter allowed keys, but erroneously used `json.dumps(data)` rather than `json.dumps(sanitized_data)` for database insertion. This rendered the sanitization ineffective, leaving the mass assignment vulnerability open.
+**Learning:** Sanitization must actually be used in the sink (like database insertion) to be effective. Validating or sanitizing an object but then passing the original object to the sink defeats the security measure.
+**Prevention:** Double-check that variables resulting from validation or sanitization are the ones actually being used in downstream logic, such as database inserts or further processing.
