@@ -25,3 +25,7 @@
 ## 2025-02-12 - Added loading state to Settings modal
 **Learning:** Adding an `isSaving` state to modals that trigger asynchronous network requests (like saving settings) prevents multiple simultaneous submissions and provides crucial visual feedback (e.g., a loading spinner and disabled buttons) to avoid user confusion.
 **Action:** Always include an `isSaving` state, disable submit buttons, and display a visual loading indicator while the request is pending when implementing or modifying modals in React.
+
+## 2026-04-29 - Accessible Custom Sliders
+**Learning:** When implementing a custom interactive element like an audio progress bar using a `div` with `role="slider"` and `tabIndex="0"`, simply making it focusable isn't enough. Screen reader users need accurate context (via `aria-valuenow`, `aria-valuemin`, `aria-valuemax`, and `aria-valuetext`), and keyboard users need explicit event handlers (like `onKeyDown`) to manipulate the value using arrow keys. Without this, the slider is completely inaccessible to anyone not using a mouse. Furthermore, focus rings on dark backgrounds might need offset colors (e.g., `focus-visible:ring-offset-slate-900`) to be visible.
+**Action:** Always pair `role="slider"` and `tabIndex="0"` with keyboard event handlers (`onKeyDown` for Arrow keys), complete ARIA state attributes (including `aria-valuetext` if the value is formatted, like time), and ensure focus rings have sufficient contrast against their background.
