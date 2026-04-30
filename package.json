@@ -23,6 +23,6 @@
   "homepage": "https://github.com/jfleck25/my-anchor-news#readme",
   "dependencies": {
     "express": "^5.2.1",
-    "puppeteer": "^24.40.0"
+    "puppeteer": "^24.42.0"
   }
 }
