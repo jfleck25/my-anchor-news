@@ -66,3 +66,10 @@
 **Vulnerability:** Setting `OAUTHLIB_INSECURE_TRANSPORT="1"` globally based solely on `FLASK_ENV != 'production'` risks unintentionally enabling insecure OAuth transport in intermediate environments (like staging or CI/CD test suites).
 **Learning:** Security-degrading developer conveniences must be strictly opt-in using explicitly named feature flags, rather than relying on broad environment negations.
 **Prevention:** Require specific override environment variables (e.g., `ALLOW_INSECURE_OAUTH=1`) for local development conveniences that weaken security, and explicitly unset dangerous flags if the override is not provided.
+## 2024-05-18 - Fix Mass Assignment in Shared Briefing
+
+**Vulnerability:** The `/api/share` endpoint failed to use the sanitized data variable `sanitized_data` when inserting the user-provided payload into the database, inserting the raw unsanitized `data` payload instead. This bypassed validation logic and caused a mass assignment vulnerability, allowing an attacker to inject potentially massive or unwanted data into the database.
+
+**Learning:** When adding security sanitation routines, simply declaring the sanitized object is insufficient. The developer must ensure the downstream sink (e.g., the database `INSERT` call) actually utilizes the sanitized output, rather than accidentally referencing the original payload.
+
+**Prevention:** Always trace the flow of sanitized variables carefully. Explicitly verify that functions saving or displaying input are provided the new validated/sanitized variables rather than the raw inputs. Additionally, write unit tests that explicitly inject malicious payload keys and verify they are omitted from final storage calls.
