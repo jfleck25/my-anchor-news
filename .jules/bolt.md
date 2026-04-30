@@ -38,3 +38,7 @@
 ## $(date +%Y-%m-%d) - Remove unnecessary string encoding for base64 decoding
 **Learning:** Python 3's `base64.urlsafe_b64decode()` natively accepts strings. Adding `.encode('ASCII')` before decoding introduces an unnecessary explicit Python-level method call and a potential string copy memory allocation overhead.
 **Action:** When using `base64.urlsafe_b64decode()` on string variables, pass the string directly without manually encoding it to bytes first.
+
+## $(date +%Y-%m-%d) - Add React.memo() to InBriefSection mapped array to prevent unnecessary re-renders
+**Learning:** React arrays directly mapped inside high-frequency updating parent components (such as a Dashboard with an updating `audioProgress` state) cause their entire DOM structures to be continuously re-evaluated and reconciled, leading to UI layout thrashing.
+**Action:** Extract deeply nested or long list components mapped inside arrays (such as the 'In Brief' mapped list) into an independent functional component wrapped in `React.memo()`. This ensures these specific sections are only re-rendered when their precise props change, isolated from the parent's rapid state updates.

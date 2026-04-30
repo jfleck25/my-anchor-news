@@ -566,6 +566,24 @@
             );
         });
 
+
+        const InBriefSection = React.memo(({ remaining_stories, storyGroupsLength }) => {
+            if (!remaining_stories || remaining_stories.length === 0) return null;
+            return (
+                <section className="mb-24" style={{ animation: 'fadeIn 0.6s ease-out both', animationDelay: `${storyGroupsLength * 150}ms` }}>
+                    <h3 className="font-display text-4xl text-slate-900 dark:text-white mb-8 border-b-2 border-slate-900 dark:border-slate-100 pb-4">In Brief</h3>
+                    <div className="grid sm:grid-cols-2 gap-x-12 gap-y-6">
+                        {remaining_stories.map((story, i) => (
+                            <div key={i} className="flex gap-4 items-start">
+                                <span className="mt-2 w-1.5 h-1.5 rounded-full bg-slate-900 dark:bg-slate-100 shrink-0"></span>
+                                <p className="font-body text-lg text-slate-800 dark:text-slate-200 leading-snug">{story.headline}</p>
+                            </div>
+                        ))}
+                    </div>
+                </section>
+            );
+        });
+
         const Dashboard = ({ userInfo, sharedData, isMockSession }) => {
             const [analysis, setAnalysis] = React.useState(sharedData || null);
             const [audioSrc, setAudioSrc] = React.useState(null);
@@ -1385,19 +1403,7 @@
                                     ))}
                                 </div>
                                 
-                                {analysis.remaining_stories && analysis.remaining_stories.length > 0 && (
-                                    <section className="mb-24" style={{ animation: 'fadeIn 0.6s ease-out both', animationDelay: `${(analysis.story_groups?.length || 0) * 150}ms` }}>
-                                        <h3 className="font-display text-4xl text-slate-900 dark:text-white mb-8 border-b-2 border-slate-900 dark:border-slate-100 pb-4">In Brief</h3>
-                                        <div className="grid sm:grid-cols-2 gap-x-12 gap-y-6">
-                                            {analysis.remaining_stories.map((story, i) => (
-                                                <div key={i} className="flex gap-4 items-start">
-                                                    <span className="mt-2 w-1.5 h-1.5 rounded-full bg-slate-900 dark:bg-slate-100 shrink-0"></span>
-                                                    <p className="font-body text-lg text-slate-800 dark:text-slate-200 leading-snug">{story.headline}</p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </section>
-                                )}
+                                <InBriefSection remaining_stories={analysis.remaining_stories} storyGroupsLength={analysis.story_groups?.length || 0} />
                             </div>
                         ) : (
                             <div className="text-center py-16 max-w-md mx-auto">
