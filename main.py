@@ -1235,7 +1235,7 @@ def share_briefing():
             try:
                 cur = conn.cursor()
                 # 🛡️ Sentinel: Fixed uninitialized variable reference; using the validated 'data'
-                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(data)))
+                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(sanitized_data)))
                 conn.commit(); cur.close()
             finally:
                 release_db_connection(conn)
