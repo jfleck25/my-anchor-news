@@ -1252,6 +1252,25 @@
                 }
             };
 
+            const handleSeekKeyDown = (e) => {
+                if (!audioRef.current || !audioDuration) return;
+                const SEEK_STEP = 5; // seconds
+                let newTime = audioRef.current.currentTime;
+
+                if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                    newTime = Math.min(newTime + SEEK_STEP, audioDuration);
+                    e.preventDefault();
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                    newTime = Math.max(newTime - SEEK_STEP, 0);
+                    e.preventDefault();
+                } else {
+                    return;
+                }
+
+                audioRef.current.currentTime = newTime;
+                setAudioProgress(newTime);
+            };
+
             const handleToggleSpeed = () => {
                 const speeds = [1.0, 1.25, 1.5, 2.0];
                 const currentIndex = speeds.indexOf(playbackRate);
@@ -1433,7 +1452,7 @@
                                     {audioSrc ? (
                                         <div className="flex items-center gap-4 w-full">
                                             <span className="font-mono text-xs text-slate-400 w-10 text-right shrink-0">{formatTime(audioProgress)}</span>
-                                            <div className="flex-1 h-3 bg-slate-700 rounded-full cursor-pointer relative overflow-hidden group" onClick={handleSeek} role="slider" aria-label="Audio progress" aria-valuemin="0" aria-valuemax={audioDuration} aria-valuenow={audioProgress} tabIndex="0">
+                                            <div className="flex-1 h-3 bg-slate-700 rounded-full cursor-pointer relative overflow-hidden group" onClick={handleSeek} onKeyDown={handleSeekKeyDown} role="slider" aria-label="Audio progress" aria-valuemin="0" aria-valuemax={audioDuration} aria-valuenow={audioProgress} aria-valuetext={formatTime(audioProgress)} tabIndex="0">
                                                 <div className="absolute top-0 left-0 bottom-0 bg-amber-500 group-hover:bg-amber-400 transition-colors" style={{ width: `${audioDuration > 0 ? (audioProgress / audioDuration) * 100 : 0}%` }}></div>
                                             </div>
                                             <span className="font-mono text-xs text-slate-400 w-10 shrink-0">{formatTime(audioDuration)}</span>
