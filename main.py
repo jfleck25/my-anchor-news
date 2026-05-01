@@ -245,7 +245,9 @@ def anonymize_user(email):
     if not email:
         return 'anonymous'
     # Use app instance secret_key for a consistent but secure salt across sessions if it persists, or fallback to something secure
-    salt = str(app.secret_key or "default_salt")
+    if not app.secret_key:
+        raise RuntimeError("FLASK_SECRET_KEY must be set for secure operations")
+    salt = str(app.secret_key)
     return hashlib.sha256((email + salt).encode()).hexdigest()
 
 
@@ -1234,8 +1236,8 @@ def share_briefing():
             conn = get_db_connection()
             try:
                 cur = conn.cursor()
-                # 🛡️ Sentinel: Fixed uninitialized variable reference; using the validated 'data'
-                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(data)))
+                # 🛡️ Sentinel: Ensure we insert the validated and sanitized variable to prevent mass assignment bypass
+                cur.execute("INSERT INTO shared_briefings (share_id, data) VALUES (%s, %s)", (share_id, json.dumps(sanitized_data)))
                 conn.commit(); cur.close()
             finally:
                 release_db_connection(conn)
