@@ -66,3 +66,12 @@
 **Vulnerability:** Setting `OAUTHLIB_INSECURE_TRANSPORT="1"` globally based solely on `FLASK_ENV != 'production'` risks unintentionally enabling insecure OAuth transport in intermediate environments (like staging or CI/CD test suites).
 **Learning:** Security-degrading developer conveniences must be strictly opt-in using explicitly named feature flags, rather than relying on broad environment negations.
 **Prevention:** Require specific override environment variables (e.g., `ALLOW_INSECURE_OAUTH=1`) for local development conveniences that weaken security, and explicitly unset dangerous flags if the override is not provided.
+## 2024-05-20 - Sanitize but use raw vulnerability
+**Vulnerability:** The code sanitized input data but mistakenly used the raw, unsanitized input variable when saving to the database, resulting in a mass assignment bypass.
+**Learning:** Even when security sanitization logic exists, it's critical to verify the downstream sink actually consumes the *sanitized* variable, not the original input. This is a common pattern when quickly trying to fix an 'uninitialized variable' error.
+**Prevention:** Ensure tight coupling between sanitization and usage, ideally by overwriting the original variable or implementing strict validation boundaries. Always review variable names in database operations.
+
+## 2024-05-20 - Hardcoded salt fallback
+**Vulnerability:** A cryptographic function (`anonymize_user`) fell back to a hardcoded, predictable string ("default_salt") if the application secret key was not set.
+**Learning:** Hardcoded cryptographic materials compromise the security of hashing/encryption functions. Relying on default fallbacks to suppress errors often masks underlying configuration failures.
+**Prevention:** Explicitly validate the presence of required security keys and fail fast (e.g., raise `RuntimeError`) rather than falling back to weak, predictable defaults.
