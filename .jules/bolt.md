@@ -38,3 +38,6 @@
 ## $(date +%Y-%m-%d) - Remove unnecessary string encoding for base64 decoding
 **Learning:** Python 3's `base64.urlsafe_b64decode()` natively accepts strings. Adding `.encode('ASCII')` before decoding introduces an unnecessary explicit Python-level method call and a potential string copy memory allocation overhead.
 **Action:** When using `base64.urlsafe_b64decode()` on string variables, pass the string directly without manually encoding it to bytes first.
+## 2024-05-19 - Use React.memo() on extracted functional list components
+**Learning:** Mapping over an array to render many child elements directly inside a parent component that updates state rapidly (e.g., audio playback progress ticks) forces all list elements to re-render constantly, crushing UI performance.
+**Action:** Extract list mappings into their own functional components and wrap them in `React.memo()`. This prevents the children from re-rendering unless their specific props change, shielding them from the parent's unrelated, high-frequency state updates.
