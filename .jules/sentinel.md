@@ -58,7 +58,7 @@
 **Learning:** Failing to remove single-use tokens (like OAuth state) from session storage after their first use leaves them vulnerable to replay attacks if an attacker intercepts an authorization response.
 **Prevention:** Always use `session.pop('key')` instead of `session['key']` when retrieving single-use security tokens from session storage to ensure they are immediately invalidated.
 
-## $(date +%Y-%m-%d) - Missing Content Security Policy (CSP) Header
+## 2026-05-02 - Missing Content Security Policy (CSP) Header
 **Vulnerability:** The application was setting several security headers (like HSTS and X-Frame-Options) but failed to set a Content-Security-Policy (CSP) header, leaving it vulnerable to Cross-Site Scripting (XSS) and other injection attacks.
 **Learning:** Even if a modern frontend framework (like React) is used, relying solely on it to prevent XSS is insufficient. A CSP acts as a crucial defense-in-depth layer, restricting the sources from which scripts, styles, and other resources can be loaded or executed, significantly mitigating the impact of any potential injection flaws.
 **Prevention:** Always implement a restrictive Content-Security-Policy header, explicitly defining allowlists for trusted sources and avoiding permissive directives like `unsafe-inline` or `unsafe-eval` unless strictly necessary and carefully reviewed.
@@ -66,3 +66,8 @@
 **Vulnerability:** Setting `OAUTHLIB_INSECURE_TRANSPORT="1"` globally based solely on `FLASK_ENV != 'production'` risks unintentionally enabling insecure OAuth transport in intermediate environments (like staging or CI/CD test suites).
 **Learning:** Security-degrading developer conveniences must be strictly opt-in using explicitly named feature flags, rather than relying on broad environment negations.
 **Prevention:** Require specific override environment variables (e.g., `ALLOW_INSECURE_OAUTH=1`) for local development conveniences that weaken security, and explicitly unset dangerous flags if the override is not provided.
+
+## 2026-05-02 - Predictable Salt in User Anonymization
+**Vulnerability:** The `anonymize_user` function fell back to a hardcoded string ("default_salt") when hashing user emails if `app.secret_key` was not set.
+**Learning:** In security-sensitive functions that rely on cryptographic keys or application-level salts (like tracking anonymization), falling back to a predictable default creates a vulnerability. If the key is missing in production, attackers can easily compute hashes and potentially reverse-engineer "anonymized" identities.
+**Prevention:** Explicitly check for the presence of cryptographic keys or application salts in security contexts. If the required key is missing, fail securely by raising a `RuntimeError` rather than silently continuing with a weak or predictable fallback value.
