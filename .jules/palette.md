@@ -25,3 +25,7 @@
 ## 2025-02-12 - Added loading state to Settings modal
 **Learning:** Adding an `isSaving` state to modals that trigger asynchronous network requests (like saving settings) prevents multiple simultaneous submissions and provides crucial visual feedback (e.g., a loading spinner and disabled buttons) to avoid user confusion.
 **Action:** Always include an `isSaving` state, disable submit buttons, and display a visual loading indicator while the request is pending when implementing or modifying modals in React.
+
+## 2026-05-02 - Custom Slider Keyboard Accessibility and Value Formatting
+**Learning:** When creating custom slider components (e.g., `<div role="slider">`), simply adding a click handler is insufficient for accessibility, as users navigating via keyboard cannot interact with the slider using coordinates (`clientX`). Arrow key navigation via an `onKeyDown` handler is essential. Additionally, while `aria-valuenow` provides the raw numerical value (like seconds), screen readers will announce this verbatim. Using `aria-valuetext` allows you to provide a human-readable format (like "02:30" instead of "150") for a much better auditory experience.
+**Action:** Always implement an `onKeyDown` handler to capture Arrow key interactions on custom sliders (`role="slider"`). Also, always include `aria-valuenow`, `aria-valuemin`, and `aria-valuemax`, and provide an `aria-valuetext` attribute if the raw value requires formatting to be easily understood.
