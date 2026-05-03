@@ -66,3 +66,11 @@
 **Vulnerability:** Setting `OAUTHLIB_INSECURE_TRANSPORT="1"` globally based solely on `FLASK_ENV != 'production'` risks unintentionally enabling insecure OAuth transport in intermediate environments (like staging or CI/CD test suites).
 **Learning:** Security-degrading developer conveniences must be strictly opt-in using explicitly named feature flags, rather than relying on broad environment negations.
 **Prevention:** Require specific override environment variables (e.g., `ALLOW_INSECURE_OAUTH=1`) for local development conveniences that weaken security, and explicitly unset dangerous flags if the override is not provided.
+
+## 2025-02-14 - Fix missing app.secret_key initialization check for anonymize_user
+
+**Vulnerability:** The `anonymize_user` function relies on `app.secret_key` as a salt for hashing user emails. If `app.secret_key` is not properly configured, it silently falls back to a hardcoded string (`"default_salt"`), causing the hash to become predictable, compromising user anonymity and reducing the effectiveness of the hash for tracking.
+
+**Learning:** Security functions relying on global variables (like `app.secret_key` in Flask) must explicitly validate their presence and securely handle missing configuration, rather than silently falling back to a deterministic, easily crackable salt.
+
+**Prevention:** Always assert the presence of critical cryptographic keys. Use standard exceptions (e.g., `RuntimeError`) or securely generated temporary keys if fallback is strictly necessary, but avoid hardcoded generic defaults.

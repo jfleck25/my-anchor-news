@@ -59,10 +59,22 @@ class TestAnonymizeUser(unittest.TestCase):
         main.app = MagicMock()
         main.app.secret_key = "test_secret_key"
 
-        salt = str(main.app.secret_key or "default_salt")
+        salt = str(main.app.secret_key)
         expected_hash = hashlib.sha256((email + salt).encode()).hexdigest()
 
         self.assertEqual(main.anonymize_user(email), expected_hash)
+
+    def test_anonymize_user_missing_secret(self):
+        """Test anonymize_user raises RuntimeError if app.secret_key is missing"""
+        email = "test@example.com"
+        main.app = MagicMock()
+        main.app.secret_key = None
+
+        with self.assertRaises(RuntimeError) as context:
+            main.anonymize_user(email)
+
+        self.assertTrue("Missing app.secret_key" in str(context.exception))
+
 
     def test_anonymize_user_consistency(self):
         """Test that same email returns same hash"""
