@@ -38,3 +38,6 @@
 ## $(date +%Y-%m-%d) - Remove unnecessary string encoding for base64 decoding
 **Learning:** Python 3's `base64.urlsafe_b64decode()` natively accepts strings. Adding `.encode('ASCII')` before decoding introduces an unnecessary explicit Python-level method call and a potential string copy memory allocation overhead.
 **Action:** When using `base64.urlsafe_b64decode()` on string variables, pass the string directly without manually encoding it to bytes first.
+## $(date +%Y-%m-%d) - Add React.memo() to prevent remaining stories list re-renders
+**Learning:** Similar to the `StoryGroup` optimization, mapping inline DOM elements for lists like `RemainingStories` inside a component with high-frequency state updates (like audio playback progress) causes continuous re-rendering of those lists, hurting UI performance.
+**Action:** Extract list mappings into their own components and wrap them in `React.memo()` so they only re-render when their actual data props change, preventing them from blindly re-rendering alongside unrelated parent state ticks.
