@@ -325,7 +325,7 @@ def load_settings(user_email=None):
     if user_email:
         with _db_settings_lock:
             if user_email in _db_settings_cache:
-                return copy.deepcopy(_db_settings_cache[user_email])
+                return json.loads(_db_settings_cache[user_email])
 
     user_settings = None
 
@@ -356,15 +356,15 @@ def load_settings(user_email=None):
                 mtime = os.path.getmtime(SETTINGS_FILE)
                 with _file_settings_lock:
                     if _file_settings_cache is not None and _file_settings_mtime == mtime:
-                        user_settings = copy.deepcopy(_file_settings_cache)
+                        user_settings = json.loads(_file_settings_cache)
 
                 if user_settings is None:
                     with open(SETTINGS_FILE, 'r') as f:
-                        data = json.load(f)
+                        raw_json = f.read()
                     with _file_settings_lock:
-                        _file_settings_cache = copy.deepcopy(data)
+                        _file_settings_cache = raw_json
                         _file_settings_mtime = mtime
-                    user_settings = copy.deepcopy(_file_settings_cache)
+                    user_settings = json.loads(_file_settings_cache)
             except Exception:
                 user_settings = defaults.copy()
 
@@ -376,7 +376,7 @@ def load_settings(user_email=None):
                 keys_to_delete = list(_db_settings_cache.keys())[:500]
                 for k in keys_to_delete:
                     del _db_settings_cache[k]
-            _db_settings_cache[user_email] = copy.deepcopy(user_settings)
+            _db_settings_cache[user_email] = json.dumps(user_settings)
 
     return user_settings
 
