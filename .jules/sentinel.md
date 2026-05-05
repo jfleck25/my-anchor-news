@@ -66,3 +66,7 @@
 **Vulnerability:** Setting `OAUTHLIB_INSECURE_TRANSPORT="1"` globally based solely on `FLASK_ENV != 'production'` risks unintentionally enabling insecure OAuth transport in intermediate environments (like staging or CI/CD test suites).
 **Learning:** Security-degrading developer conveniences must be strictly opt-in using explicitly named feature flags, rather than relying on broad environment negations.
 **Prevention:** Require specific override environment variables (e.g., `ALLOW_INSECURE_OAUTH=1`) for local development conveniences that weaken security, and explicitly unset dangerous flags if the override is not provided.
+## 2024-05-18 - Bypassed Security Sanitization in DB Storage
+**Vulnerability:** The application performed sanitization by plucking allowed keys into a new `sanitized_data` dictionary, but subsequently serialized and stored the original unsanitized `data` dictionary.
+**Learning:** Creating sanitized variables does not automatically secure the application. If the downstream sinks (like database `INSERT` operations) do not explicitly use the newly created sanitized variables, the validation is entirely bypassed, leaving the application vulnerable to mass assignment or abusive storage.
+**Prevention:** Explicitly verify that newly created sanitized variables (e.g., `sanitized_data`) are the ones passed to downstream sinks rather than the original unsanitized inputs.
